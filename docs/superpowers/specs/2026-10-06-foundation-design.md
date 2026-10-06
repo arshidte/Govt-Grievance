@@ -24,6 +24,20 @@ Two web experiences share one backend:
 Ward Members/Representatives and Coordinators will use a **future mobile app**
 that consumes the **same** NestJS API without backend changes.
 
+### Milestone 1 objective
+
+Prove the foundation end-to-end and nothing more:
+
+> **Authentication → Identity → Role assignments → Scoped permissions →
+> Application shell → Responsive navigation → i18n → Design system →
+> Auditability.**
+
+M1 is deliberately **not** expanded with business features. Organization CRUD
+screens, the Issue UI/workflow, and category management are explicitly out
+(their backend models/relationships and the minimal read/access needed for
+auth, RBAC, scope resolution, and testing may exist). The architecture stays
+production-oriented while avoiding premature complexity.
+
 ### Scope of this milestone (Foundation vertical slice)
 
 **In scope (fully built):** monorepo scaffold; PostgreSQL + Prisma; identity,
@@ -168,11 +182,31 @@ AuditLog     ──*:1── actor:User       (polymorphic entityType/entityId; 
 relationships are as shown in 4.1. Detailed columns, the status lifecycle, SLA,
 and escalation workflow are designed in Milestone 2.
 
+**Category/Subcategory** are an exception: their tables are created **and seeded**
+in M1 (see 4.4) so categories are database-driven from day one and never
+hardcoded in the frontend. Category *management UI* remains out of M1 (M4).
+
 ### 4.4 Seed data
 
 Bootstraps one ADMIN user, a sample Panchayat with wards, and sample staff
 (coordinator + representative) so the system is usable immediately. Citizens
 self-register via OTP.
+
+Also seeds a small realistic initial **Category** set (with a few subcategories),
+served from the database — the frontend must consume these via the API, never
+hardcode them:
+
+- Certificates & Applications
+- Property & Building
+- Waste Management
+- Water & Drainage
+- Roads & Infrastructure
+- Street Lighting
+- Public Health
+- Welfare Services
+- Tax & Revenue
+- Licensing
+- Other
 
 ---
 
@@ -207,8 +241,34 @@ self-register via OTP.
   assignments.
 
 Staff use the same OTP mechanism; the admin app additionally requires the
-authenticated user to hold a staff role, else forbidden. (Password/2FA can be
-layered on later without schema changes.)
+authenticated user to hold a staff role, else forbidden.
+
+### 6.3 Staff authentication posture (M1 vs. future)
+
+OTP-only is the **M1 authentication layer, not the final government-production
+security model**. The identity/session/RBAC design must let stronger staff
+authentication (password, MFA/2FA, step-up auth) be added later **without
+redesigning identity, sessions, or RBAC**. Enablers already in the model:
+auth method is decoupled from identity (`User`) and from authorization
+(`RoleAssignment`); sessions are DB-backed and independently revocable; adding
+a credential/2FA factor is additive (new tables/fields), not a rewrite.
+
+M1 staff-auth requirements:
+
+- Staff/admin accounts are **provisioned by authorized administrators or seed
+  data** — a user cannot self-register *as staff*; self-registration only ever
+  creates a plain citizen identity. Staff capability comes solely from an
+  admin-granted `RoleAssignment`.
+- Staff access requires an **active** staff role (disabled user or revoked
+  assignment ⇒ no access).
+- Sessions are **immediately revocable** (DB-backed; revoking takes effect on
+  the next request).
+- OTP request and verification are **rate-limited** (per phone and per IP).
+- Authentication events (OTP requested, verified, failed, session created,
+  session revoked) are **auditable** via `AuditLog`.
+- Responses **must not reveal** whether a phone number belongs to a staff
+  account (or whether it exists at all) — OTP request/verify responses are
+  uniform regardless of account type or existence.
 
 ### 6.2 Permission model
 
@@ -341,7 +401,13 @@ Each milestone gets its own spec → plan → implementation cycle.
 ## 14. Non-goals for this milestone
 
 - No Issue submission/tracking UI or workflow (M2).
-- No org-entity admin CRUD screens (M4).
+- No org-entity admin CRUD screens (M4) — backend models, relationships,
+  minimal read/access for auth/RBAC/scope resolution, and seed data only.
+- No category management UI (M4) — categories are seeded and served from the
+  DB; the frontend consumes them via API and never hardcodes them.
+- No password/MFA/2FA staff auth yet (OTP-only is the M1 layer; design leaves
+  room to add stronger staff auth later without redesigning identity/session/
+  RBAC).
 - No real SMS provider integration (mock only; interface ready).
 - No AWS infra provisioning (deployment-ready design only).
 - No offline issue submission.
