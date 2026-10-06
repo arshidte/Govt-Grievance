@@ -34,6 +34,22 @@ importers:
         specifier: ^8.8.0
         version: 8.71.1(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3)
 
+  packages/i18n:
+    dependencies:
+      '@pg/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@pg/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9
+
   packages/types:
     dependencies:
       zod:
