@@ -6,8 +6,11 @@ import { env } from '../config/env';
  * Shared attributes for the session cookie, independent of value/lifetime.
  *
  * - `httpOnly`: JS (and thus XSS) cannot read the token.
- * - `secure`: only sent over HTTPS. (The platform terminates TLS in front of
- *   the API in every deployed environment.)
+ * - `secure`: only sent over HTTPS. Conditional on `NODE_ENV === 'production'`
+ *   so cookie auth still works over plain local HTTP in dev and in e2e tests
+ *   (browsers refuse to send `Secure` cookies back over `http://`). In every
+ *   deployed (production) environment the platform terminates TLS in front
+ *   of the API, so `secure: true` there costs nothing.
  * - `sameSite: 'lax'`: the cookie rides top-level navigations but not
  *   cross-site subrequests, mitigating CSRF while keeping normal links
  *   working.
@@ -15,7 +18,7 @@ import { env } from '../config/env';
  */
 const BASE_COOKIE_OPTIONS: Readonly<CookieOptions> = {
   httpOnly: true,
-  secure: true,
+  secure: env.NODE_ENV === 'production',
   sameSite: 'lax',
   path: '/',
 };

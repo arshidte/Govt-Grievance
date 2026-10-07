@@ -28,6 +28,7 @@ function loadDotEnv(): void {
 loadDotEnv();
 
 const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   API_PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN_CITIZEN: z.string().min(1).default('http://localhost:3000'),

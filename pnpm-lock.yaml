@@ -29,6 +29,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^12.1.2
         version: 12.1.2(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.2)
+      '@pg/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@prisma/client':
         specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
@@ -72,6 +75,9 @@ importers:
       '@types/cookie-parser':
         specifier: ^1.4.7
         version: 1.4.10(@types/express@5.0.6)
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
