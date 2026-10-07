@@ -17,8 +17,14 @@ export class MockSmsProvider implements SmsProvider {
   private readonly lastMessageByPhone = new Map<string, string>();
 
   async send(phone: string, message: string): Promise<void> {
+    // Keep the full message (incl. the OTP code) in memory for dev/test
+    // retrieval via lastMessageFor/lastCodeFor and the future Task 23 dev
+    // endpoint.
     this.lastMessageByPhone.set(phone, message);
-    this.logger.log(`SMS to ${phone}: ${message}`);
+    // Do NOT log the message body: it contains the plaintext OTP code, and
+    // "OTP codes are never stored or logged in plaintext" is a project
+    // Global Constraint. Log only the non-sensitive phone number.
+    this.logger.log(`Mock SMS queued for ${phone}`);
   }
 
   /** Full text of the last message sent to `phone`, if any. */
