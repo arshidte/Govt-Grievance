@@ -1,9 +1,11 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { requestOtpSchema, verifyOtpSchema, type MeResponse } from '@pg/types';
 import type { Request, Response } from 'express';
 
 import { AuditService } from '../audit/audit.service';
 import { ApiError } from '../common/api-error';
+import { AUTH_THROTTLE_LIMIT, AUTH_THROTTLE_TTL_MS } from '../common/throttler.config';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
@@ -23,6 +25,18 @@ function maskPhone(phone: string): string {
   return '*'.repeat(Math.max(phone.length - visible.length, 0)) + visible;
 }
 
+/**
+ * Overrides the globally-registered `default` throttler (see
+ * `ThrottlerModule.forRoot` in `app.module.ts`) with a MUCH tighter
+ * limit/window for every route on this controller. Auth endpoints
+ * (`request-otp`/`verify-otp` especially) are the most attractive target
+ * for abuse — OTP flooding, SMS-cost exhaustion, credential/code guessing —
+ * so they must throttle harder than the rest of the API (acceptance
+ * criterion for Task 15). Values are centralized in
+ * `src/common/throttler.config.ts` so they're easy to find and to assert
+ * against in `test/throttle.e2e-spec.ts`.
+ */
+@Throttle({ default: { limit: AUTH_THROTTLE_LIMIT, ttl: AUTH_THROTTLE_TTL_MS } })
 @Controller('auth')
 export class AuthController {
   constructor(
