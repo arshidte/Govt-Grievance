@@ -1,0 +1,8 @@
+{
+  "extends": "@pg/config/tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["src", "tailwind.preset.ts"]
+}

@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Design tokens surfaced as CSS custom properties, so non-Tailwind CSS
+ * (or inline styles) can reference them too. Values are kept in sync
+ * with src/tokens.ts and src/fonts.ts by hand — tokens.ts is the single
+ * source of truth; this file mirrors it for CSS consumers.
+ */
+:root {
+  /* Primary (civic deep-blue) */
+  --color-primary-50: #eef3fb;
+  --color-primary-100: #d6e3f5;
+  --color-primary-200: #aec7ea;
+  --color-primary-300: #80a6dc;
+  --color-primary-400: #5484cc;
+  --color-primary-500: #3568b8;
+  --color-primary-600: #24509c;
+  --color-primary-700: #1c3f7e;
+  --color-primary-800: #17315f;
+  --color-primary-900: #102142;
+
+  /* Neutral grays */
+  --color-neutral-50: #f8f9fa;
+  --color-neutral-100: #eef0f2;
+  --color-neutral-200: #dde1e6;
+  --color-neutral-300: #c3c9d1;
+  --color-neutral-400: #9aa3ae;
+  --color-neutral-500: #717b87;
+  --color-neutral-600: #545d68;
+  --color-neutral-700: #3d434d;
+  --color-neutral-800: #272b32;
+  --color-neutral-900: #15171b;
+
+  /* Status (grievance lifecycle) */
+  --color-status-submitted: #3568b8;
+  --color-status-acknowledged: #0f766e;
+  --color-status-underReview: #7c3aed;
+  --color-status-assigned: #0369a1;
+  --color-status-inProgress: #b45309;
+  --color-status-waitingForInformation: #a16207;
+  --color-status-escalated: #b91c1c;
+  --color-status-resolved: #15803d;
+  --color-status-closed: #4b5563;
+  --color-status-reopened: #c2410c;
+
+  /* Priority */
+  --color-priority-low: #15803d;
+  --color-priority-medium: #a16207;
+  --color-priority-high: #c2410c;
+  --color-priority-urgent: #b91c1c;
+
+  /* Spacing */
+  --spacing-0: 0px;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+
+  /* Radius */
+  --radius-none: 0px;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /*
+   * Font-family CSS variables. Consuming apps assign next/font's
+   * `.variable` output to these SAME names on <html>/<body>; the
+   * fallback stacks below apply until an app wires next/font.
+   */
+  --font-sans: Inter, 'Noto Sans Malayalam', ui-sans-serif, system-ui,
+    -apple-system, sans-serif;
+  --font-malayalam: 'Noto Sans Malayalam', Inter, ui-sans-serif, system-ui,
+    sans-serif;
+}

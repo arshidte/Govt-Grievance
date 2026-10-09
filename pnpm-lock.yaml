@@ -185,6 +185,22 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@26.6.4)
 
+  packages/ui:
+    dependencies:
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19(tsx@4.23.15)
+    devDependencies:
+      '@pg/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@26.6.4)
+
 packages:
 
   '@alloc/quick-lru@5.3.0':
