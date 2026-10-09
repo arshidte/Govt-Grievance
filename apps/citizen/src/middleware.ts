@@ -12,7 +12,12 @@ import { defaultLocale, locales } from '@pg/i18n';
  */
 const SESSION_COOKIE_NAME = 'pg_session';
 
-/** Public routes that never require a session cookie. */
+/**
+ * Public routes that never require a session cookie.
+ * NOTE (T23+): any NEW public auth page (e.g. `/verify`, `/register`) MUST be
+ * added here (or to the `/login` segment check in isPublicPath) or it will be
+ * gated by the session-cookie auth gate below.
+ */
 const PUBLIC_PATHS = new Set(['/', '/track']);
 
 const intlMiddleware = createIntlMiddleware({
@@ -33,7 +38,13 @@ function stripLocalePrefix(pathname: string): string {
 
 function isPublicPath(pathname: string): boolean {
   const unprefixed = stripLocalePrefix(pathname);
-  return PUBLIC_PATHS.has(unprefixed) || unprefixed.startsWith('/login');
+  // Segment match for /login (not a bare prefix) so sibling routes like
+  // `/login-help` / `/loginassistant` are NOT silently treated as public.
+  return (
+    PUBLIC_PATHS.has(unprefixed) ||
+    unprefixed === '/login' ||
+    unprefixed.startsWith('/login/')
+  );
 }
 
 /**
