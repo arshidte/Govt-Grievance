@@ -1,18 +1,24 @@
 /**
- * Citizen auth happy-path e2e spec (Task 23).
+ * Citizen auth happy-path e2e spec (Task 23; extended in Task 24).
  *
  * EXECUTION DEFERRED TO TASK 28 (ruling R15): no Playwright config, browser
  * binaries, or test runner wiring exist in this repo yet — that setup is
  * explicitly Task 28's responsibility. This file is AUTHORED now (per the
  * brief) against stable `data-testid` selectors already present in the
- * implemented pages/components, but it is NOT run as part of Task 23's
+ * implemented pages/components, but it is NOT run as part of Task 23/24's
  * verification. Do not add `@playwright/test` to package.json or attempt
  * to run this from this task — that would pre-empt T28's setup.
  *
  * Flow covered: visit `/` -> click the Login link -> submit a dev phone on
  * `/login` -> read the OTP via the dev-only `GET /api/v1/dev/last-otp`
  * endpoint (added in this task on the API, guarded to be production-inert)
- * -> submit the code on `/verify` -> land on `/home`.
+ * -> submit the code on `/verify` -> land on `/home` (T23).
+ *
+ * T24 extension: once on `/home`, assert the authed overview actually
+ * rendered (stat tiles + empty-state copy, not just the bare page shell);
+ * navigate via the bottom nav to `/profile` and assert the user's phone is
+ * shown (pre-filled, read-only); then exercise the `LanguageSwitcher` (if
+ * present in the shell) and confirm visible copy switches to Malayalam.
  */
 import { expect, test } from '@playwright/test';
 
@@ -51,5 +57,25 @@ test.describe('citizen auth', () => {
 
     await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByTestId('home-page')).toBeVisible();
+
+    // T24: the authed overview itself rendered (not just the page shell) —
+    // zeroed stat tiles + the "no issues yet" empty-state copy (issue data
+    // is M2 scope, so these must never show invented counts).
+    await expect(page.getByTestId('home-overview')).toBeVisible();
+    await expect(page.getByTestId('home-empty-state')).toBeVisible();
+
+    // T24: navigate via the sticky bottom nav (44px targets, aria-current)
+    // to /profile and confirm the user's own phone is shown, pre-filled
+    // and read-only, from `useMe` through the BFF.
+    await page.getByTestId('bottom-nav-profile').click();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByTestId('bottom-nav-profile')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('profile-phone')).toHaveValue(phone);
+
+    // T24: the LanguageSwitcher (in the authed shell's header) toggles
+    // visible copy to Malayalam — assert on a string that differs between
+    // en/ml (the profile page's own translated title).
+    await page.getByRole('radio', { name: 'ML' }).click();
+    await expect(page.getByRole('heading', { name: 'നിങ്ങളുടെ പ്രൊഫൈൽ' })).toBeVisible();
   });
 });

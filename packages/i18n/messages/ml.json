@@ -35,6 +35,59 @@
     "report": "പരാതി രേഖപ്പെടുത്തുക",
     "profile": "പ്രൊഫൈൽ"
   },
+  "landing": {
+    "title": "പഞ്ചായത്ത് പരാതി പ്ലാറ്റ്‌ഫോം",
+    "metaTitle": "Panchayat Grievance Platform — Report and track local issues",
+    "metaDescription": "Report civic issues to your panchayat and track their resolution online — roads, water supply, electricity, sanitation and more.",
+    "tagline": "പ്രാദേശിക പ്രശ്നങ്ങൾ റിപ്പോർട്ട് ചെയ്യുക. പരിഹാരം വരെ ട്രാക്ക് ചെയ്യുക.",
+    "reportCta": "പരാതി രേഖപ്പെടുത്തുക",
+    "trackCta": "പരാതി ട്രാക്ക് ചെയ്യുക",
+    "loginCta": "ലോഗിൻ"
+  },
+  "track": {
+    "title": "പരാതി ട്രാക്ക് ചെയ്യുക",
+    "subtitle": "നിങ്ങളുടെ പരാതിയുടെ സ്ഥിതി പരിശോധിക്കാൻ റഫറൻസ് നമ്പർ നൽകുക.",
+    "referenceLabel": "റഫറൻസ് നമ്പർ",
+    "referencePlaceholder": "e.g. PG-2026-000123",
+    "lookupCta": "പരിശോധിക്കുക",
+    "signInForDetails": "ഈ പരാതിയുടെ പൂർണ്ണ വിവരങ്ങളും സ്ഥിതി ചരിത്രവും കാണാൻ ലോഗിൻ ചെയ്യുക.",
+    "signInCta": "ലോഗിൻ",
+    "invalidReference": "സാധുവായ റഫറൻസ് നമ്പർ നൽകുക."
+  },
+  "home": {
+    "title": "നിങ്ങളുടെ അവലോകനം",
+    "active": "സജീവം",
+    "awaiting": "നിങ്ങളുടെ പ്രതികരണം കാത്തിരിക്കുന്നു",
+    "resolved": "പരിഹരിച്ചു",
+    "emptyTitle": "ഇതുവരെ പരാതികൾ രേഖപ്പെടുത്തിയിട്ടില്ല",
+    "emptyDescription": "നിങ്ങൾ രേഖപ്പെടുത്തുന്ന പരാതികൾ അവയുടെ സ്ഥിതിയോടെ ഇവിടെ കാണാം.",
+    "reportCta": "പരാതി രേഖപ്പെടുത്തുക"
+  },
+  "profile": {
+    "title": "നിങ്ങളുടെ പ്രൊഫൈൽ",
+    "subtitle": "നിങ്ങളുടെ വിവരങ്ങൾ കാലികമായി സൂക്ഷിക്കുക.",
+    "phoneLabel": "മൊബൈൽ നമ്പർ",
+    "saveSuccessTitle": "പ്രൊഫൈൽ അപ്ഡേറ്റ് ചെയ്തു",
+    "saveSuccessDescription": "നിങ്ങളുടെ മാറ്റങ്ങൾ സംരക്ഷിച്ചു.",
+    "loadFailed": "നിങ്ങളുടെ പ്രൊഫൈൽ ലോഡ് ചെയ്യാനായില്ല."
+  },
+  "notifications": {
+    "title": "അറിയിപ്പുകൾ",
+    "emptyTitle": "ഇതുവരെ അറിയിപ്പുകൾ ഒന്നുമില്ല",
+    "emptyDescription": "നിങ്ങളുടെ പരാതികളിൽ പുതിയ വിവരങ്ങൾ ഉണ്ടാകുമ്പോൾ ഞങ്ങൾ ഇവിടെ അറിയിക്കും."
+  },
+  "bottomNav": {
+    "navLabel": "പ്രധാന നാവിഗേഷൻ",
+    "home": "ഹോം",
+    "report": "റിപ്പോർട്ട്",
+    "track": "ട്രാക്ക്",
+    "profile": "പ്രൊഫൈൽ"
+  },
+  "languageSwitcher": {
+    "label": "ഭാഷ",
+    "en": "EN",
+    "ml": "ML"
+  },
   "auth": {
     "phoneLabel": "മൊബൈൽ നമ്പർ",
     "phonePlaceholder": "+91XXXXXXXXXX",

@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import type { NextResponse, NextRequest } from 'next/server';
+import { proxyToApi } from '../../../../../lib/bff-proxy';
 
 /**
  * BFF (backend-for-frontend) proxy for `/api/v1/auth/*`.
@@ -20,82 +21,20 @@ import { NextResponse, type NextRequest } from 'next/server';
  * API's own origin, which browsers restrict far more heavily (SameSite,
  * third-party cookie blocking, etc.).
  *
- * `API_INTERNAL_URL` (server-to-server origin, e.g. `http://localhost:4000`
- * in dev) is read from `process.env` on the SERVER only — it is never sent
- * to or referenced from client code, so it cannot leak into a browser
- * bundle or response.
+ * RULING R17 (T24): the actual relay mechanics (fetch, header forwarding,
+ * Set-Cookie fan-out, 502 fallback) now live in `src/lib/bff-proxy.ts`
+ * (`proxyToApi`), shared with the general `/api/v1/[...path]/route.ts`
+ * catch-all added in T24 for `/users/*` and `/categories`. This file keeps
+ * only the `action` param -> `auth/<action>` path prefixing that is
+ * specific to this route's mount point. Behavior is unchanged — this
+ * route's own test suite (`route.test.ts`) still passes unmodified.
  */
-
-const UPSTREAM_BASE = process.env.API_INTERNAL_URL;
-
-function upstreamUrl(action: string[], search: string): string {
-  const path = action.join('/');
-  return `${UPSTREAM_BASE}/api/v1/auth/${path}${search}`;
-}
-
-async function proxy(request: NextRequest, action: string[]): Promise<NextResponse> {
-  const url = upstreamUrl(action, request.nextUrl.search);
-
-  const headers = new Headers();
-  const contentType = request.headers.get('content-type');
-  if (contentType) headers.set('content-type', contentType);
-  const cookie = request.headers.get('cookie');
-  if (cookie) headers.set('cookie', cookie);
-
-  const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
-
-  let upstreamResponse: Response;
-  try {
-    upstreamResponse = await fetch(url, {
-      method: request.method,
-      headers,
-      body: hasBody ? await request.text() : undefined,
-      // Server-to-server call: this process IS the credential boundary for
-      // the incoming browser request (we forward its Cookie header above
-      // explicitly), so no `credentials` option is needed/applicable here.
-      redirect: 'manual',
-    });
-  } catch {
-    // Upstream unreachable — do not leak the internal URL or raw error.
-    return NextResponse.json(
-      { error: { code: 'upstream_unreachable', messageKey: 'errors.network' } },
-      { status: 502 },
-    );
-  }
-
-  const bodyText = await upstreamResponse.text();
-  const response = new NextResponse(bodyText, {
-    status: upstreamResponse.status,
-    statusText: upstreamResponse.statusText,
-  });
-
-  const responseContentType = upstreamResponse.headers.get('content-type');
-  if (responseContentType) {
-    response.headers.set('content-type', responseContentType);
-  }
-
-  // Set-Cookie footgun: `fetch`/`Headers.get('set-cookie')` folds MULTIPLE
-  // Set-Cookie response headers into one comma-joined string, which is NOT
-  // valid for re-emitting as separate cookies (commas appear inside cookie
-  // attributes like `Expires`, so naive splitting corrupts them too).
-  // `getSetCookie()` (undici/Next's Headers extension) returns each
-  // Set-Cookie header as a separate array entry instead — append each one
-  // individually onto the outgoing NextResponse so every upstream cookie
-  // (e.g. the `pg_session` cookie set by verify-otp, or cleared by logout)
-  // is relayed intact, first-party, to the browser.
-  for (const setCookie of upstreamResponse.headers.getSetCookie()) {
-    response.headers.append('set-cookie', setCookie);
-  }
-
-  return response;
-}
-
 async function handler(
   request: NextRequest,
   { params }: { params: Promise<{ action: string[] }> },
 ): Promise<NextResponse> {
   const { action } = await params;
-  return proxy(request, action);
+  return proxyToApi(request, ['auth', ...action]);
 }
 
 export const GET = handler;

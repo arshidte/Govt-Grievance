@@ -35,6 +35,59 @@
     "report": "Report an issue",
     "profile": "Profile"
   },
+  "landing": {
+    "title": "Panchayat Grievance Platform",
+    "metaTitle": "Panchayat Grievance Platform — Report and track local issues",
+    "metaDescription": "Report civic issues to your panchayat and track their resolution online — roads, water supply, electricity, sanitation and more.",
+    "tagline": "Report local issues. Track them through to resolution.",
+    "reportCta": "Report an Issue",
+    "trackCta": "Track a grievance",
+    "loginCta": "Log in"
+  },
+  "track": {
+    "title": "Track a grievance",
+    "subtitle": "Enter your grievance reference number to check its status.",
+    "referenceLabel": "Reference number",
+    "referencePlaceholder": "e.g. PG-2026-000123",
+    "lookupCta": "Look up",
+    "signInForDetails": "Sign in to view the full details and status history of this grievance.",
+    "signInCta": "Log in",
+    "invalidReference": "Enter a valid reference number."
+  },
+  "home": {
+    "title": "Your overview",
+    "active": "Active",
+    "awaiting": "Awaiting your response",
+    "resolved": "Resolved",
+    "emptyTitle": "No issues reported yet",
+    "emptyDescription": "Issues you report will appear here with their status.",
+    "reportCta": "Report an issue"
+  },
+  "profile": {
+    "title": "Your profile",
+    "subtitle": "Keep your details up to date.",
+    "phoneLabel": "Mobile number",
+    "saveSuccessTitle": "Profile updated",
+    "saveSuccessDescription": "Your changes have been saved.",
+    "loadFailed": "Could not load your profile."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "emptyTitle": "No notifications yet",
+    "emptyDescription": "We'll let you know here when there's an update on your issues."
+  },
+  "bottomNav": {
+    "navLabel": "Primary",
+    "home": "Home",
+    "report": "Report",
+    "track": "Track",
+    "profile": "Profile"
+  },
+  "languageSwitcher": {
+    "label": "Language",
+    "en": "EN",
+    "ml": "ML"
+  },
   "auth": {
     "phoneLabel": "Mobile number",
     "phonePlaceholder": "+91XXXXXXXXXX",
