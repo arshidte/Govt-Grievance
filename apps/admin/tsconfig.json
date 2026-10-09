@@ -1,0 +1,28 @@
+{
+  "extends": "@pg/config/tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    ".next",
+    // Playwright spec authored in T25; execution + Playwright dependency +
+    // tsconfig wiring are deferred to T28 (ruling R15) — see
+    // e2e/admin-auth.spec.ts's header comment. Excluded from typecheck here
+    // for the same reason it's excluded from vitest (vitest.config.ts).
+    "e2e"
+  ]
+}

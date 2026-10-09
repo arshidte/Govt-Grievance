@@ -161,5 +161,11 @@
     "landAndEncroachment": "Land and encroachment",
     "publicSafety": "Public safety",
     "other": "Other"
+  },
+  "admin": {
+    "loginTitle": "Staff sign in",
+    "loginSubtitle": "Sign in with your mobile number to access the admin console.",
+    "forbiddenTitle": "Access denied",
+    "forbiddenDescription": "Your account does not have staff access to the admin console."
   }
 }
