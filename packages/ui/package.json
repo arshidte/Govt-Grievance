@@ -14,7 +14,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pg/i18n": "workspace:*",
+    "@pg/types": "workspace:*",
     "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-toast": "^1.2.24",
     "tailwindcss": "^3.4.0"
   },
   "peerDependencies": {
