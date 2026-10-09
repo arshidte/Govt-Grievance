@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nes
 import { requestOtpSchema, verifyOtpSchema, type MeResponse } from '@pg/types';
 import type { Request, Response } from 'express';
 
+import { AuditService } from '../audit/audit.service';
+import { ApiError } from '../common/api-error';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
@@ -10,12 +12,24 @@ import { CurrentUser } from './current-user.decorator';
 import { OtpService } from './otp.service';
 import { SessionService, type SessionUser } from './session.service';
 
+/**
+ * Masks `phone` to its last 4 digits for audit metadata (e.g.
+ * `+919876543210` -> `*********3210`). GLOBAL CONSTRAINT: audit metadata
+ * must never contain a plaintext phone number or OTP code — this is the
+ * only form of `phone` that may be recorded.
+ */
+function maskPhone(phone: string): string {
+  const visible = phone.slice(-4);
+  return '*'.repeat(Math.max(phone.length - visible.length, 0)) + visible;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly auth: AuthService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -32,6 +46,13 @@ export class AuthController {
     @Body(new ZodValidationPipe(requestOtpSchema)) body: { phone: string },
   ): Promise<{ ok: true }> {
     await this.otp.request(body.phone);
+
+    await this.audit.record({
+      action: 'otp.requested',
+      entityType: 'User',
+      metadata: { phoneMasked: maskPhone(body.phone) },
+    });
+
     return { ok: true };
   }
 
@@ -52,13 +73,48 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<MeResponse> {
-    await this.otp.verify(body.phone, body.code);
+    const phoneMasked = maskPhone(body.phone);
+
+    try {
+      await this.otp.verify(body.phone, body.code);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // Audit the failure, then re-throw the SAME uniform error unchanged
+        // (see OtpService.verify doc) — the non-disclosure contract must
+        // not be affected by auditing.
+        await this.audit.record({
+          action: 'otp.failed',
+          entityType: 'User',
+          metadata: { phoneMasked },
+          ip: req.ip,
+        });
+      }
+      throw err;
+    }
 
     const user = await this.auth.findOrCreateCitizenByPhone(body.phone);
+
+    await this.audit.record({
+      actorUserId: user.id,
+      action: 'otp.verified',
+      entityType: 'User',
+      entityId: user.id,
+      metadata: { phoneMasked },
+      ip: req.ip,
+    });
 
     const { token } = await this.sessions.create(user.id, {
       ip: req.ip,
       userAgent: req.get('user-agent'),
+    });
+
+    await this.audit.record({
+      actorUserId: user.id,
+      action: 'session.created',
+      entityType: 'User',
+      entityId: user.id,
+      metadata: { phoneMasked },
+      ip: req.ip,
     });
 
     const cookie = buildSessionCookie(token);
@@ -83,7 +139,28 @@ export class AuthController {
     const token = req.cookies?.[SESSION_COOKIE_NAME] as string | undefined;
 
     if (token) {
+      // Resolve the session's user BEFORE revoking, both to attribute the
+      // audit row (actorUserId) and to know whether there was actually a
+      // live session to revoke. If the token is already invalid/expired,
+      // `validate` throws the uniform unauthenticated ApiError; swallow it
+      // here (logout stays idempotent/always-200 regardless of token
+      // validity) and skip the audit row — nothing was actually revoked.
+      const actorUserId = await this.sessions
+        .validate(token)
+        .then((user) => user.id)
+        .catch(() => undefined);
+
       await this.sessions.revoke(token);
+
+      if (actorUserId) {
+        await this.audit.record({
+          actorUserId,
+          action: 'session.revoked',
+          entityType: 'User',
+          entityId: actorUserId,
+          ip: req.ip,
+        });
+      }
     }
 
     const cleared = buildClearSessionCookie();
