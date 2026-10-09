@@ -18,12 +18,15 @@ import { SessionService } from './session.service';
  * auth audit events (`otp.requested`/`otp.verified`/`otp.failed`/
  * `session.created`/`session.revoked`) — see Task 13. `AuthGuard` is
  * exported so other feature modules can `@UseGuards(AuthGuard)` on their own
- * controllers without re-importing `SmsModule`.
+ * controllers without re-importing `SmsModule`. `AuthService` is exported so
+ * those same feature modules can reuse `toMeResponse` to serialize a
+ * `MeResponse` (e.g. `UsersController` after a profile update) rather than
+ * re-deriving that DTO shape (Task 14).
  */
 @Module({
   imports: [SmsModule, AuditModule],
   controllers: [AuthController],
   providers: [OtpService, SessionService, AuthService, AuthGuard],
-  exports: [OtpService, SessionService, AuthGuard],
+  exports: [OtpService, SessionService, AuthService, AuthGuard],
 })
 export class AuthModule {}
