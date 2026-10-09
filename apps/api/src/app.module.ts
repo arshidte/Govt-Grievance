@@ -4,12 +4,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AccessModule } from './access/access.module';
+import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { DEFAULT_THROTTLE_LIMIT, DEFAULT_THROTTLE_TTL_MS } from './common/throttler.config';
 import { env } from './config/env';
 import { HealthController } from './health/health.controller';
+import { IssuesModule } from './issues/issues.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrgModule } from './org/org.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -36,7 +39,10 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     AuthModule,
     AccessModule,
+    AttachmentsModule,
     CatalogModule,
+    IssuesModule,
+    NotificationsModule,
     OrgModule,
     UsersModule,
   ],
