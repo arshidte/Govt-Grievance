@@ -5,7 +5,7 @@
  */
 export default function HomePage() {
   return (
-    <main className="p-8">
+    <main className="p-8" data-testid="home-page">
       <h1 className="text-xl font-semibold">Home</h1>
     </main>
   );

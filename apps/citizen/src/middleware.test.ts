@@ -68,6 +68,18 @@ describe('middleware', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 
+  it('passes through /verify without a session cookie (T23 — reached before the cookie is set)', () => {
+    const req = makeRequest('/en/verify');
+    const res = middleware(req);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('passes through /register without a session cookie (T23)', () => {
+    const req = makeRequest('/en/register');
+    const res = middleware(req);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
   it('GATES a /login-prefixed sibling route (segment match, not bare prefix)', () => {
     // `/login-help` must NOT be treated as public just because it starts
     // with `/login` — an unauthenticated request should be gated to /login.

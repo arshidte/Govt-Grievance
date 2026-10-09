@@ -17,8 +17,14 @@ const SESSION_COOKIE_NAME = 'pg_session';
  * NOTE (T23+): any NEW public auth page (e.g. `/verify`, `/register`) MUST be
  * added here (or to the `/login` segment check in isPublicPath) or it will be
  * gated by the session-cookie auth gate below.
+ *
+ * `/verify` and `/register` (T23): both are reached mid-flow, BEFORE (or
+ * immediately upon receiving) the session cookie — `/verify` posts the OTP
+ * code that gets the cookie set in the first place, and `/register` is the
+ * very next hop after that for a brand-new account. Gating either one would
+ * create a redirect loop back to `/login`.
  */
-const PUBLIC_PATHS = new Set(['/', '/track']);
+const PUBLIC_PATHS = new Set(['/', '/track', '/verify', '/register']);
 
 const intlMiddleware = createIntlMiddleware({
   locales,
