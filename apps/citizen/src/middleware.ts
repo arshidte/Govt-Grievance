@@ -10,7 +10,16 @@ import { defaultLocale, locales } from '@pg/i18n';
  * and compare the remainder against a fixed list of public paths, with no
  * guessing about whether a leading segment is a locale or a route name.
  */
-const SESSION_COOKIE_NAME = 'pg_session';
+/**
+ * Session cookie name. Read from `SESSION_COOKIE_NAME` — the SAME env var the
+ * API's `env.ts` uses — so overriding it keeps the API and this middleware's
+ * presence-gate in sync; defaults to `pg_session` (env.ts's own default).
+ * NOTE: Next inlines `process.env.*` into middleware at BUILD time, so to use
+ * a non-default name this var must be set when BUILDING the app and must match
+ * the API's configured value. (This check is UX-only; the backend remains the
+ * authoritative auth layer regardless.)
+ */
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'pg_session';
 
 /**
  * Public routes that never require a session cookie.

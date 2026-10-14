@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware } from './middleware';
 
@@ -85,5 +85,21 @@ describe('middleware', () => {
     const res = middleware(req);
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it('honors a configured SESSION_COOKIE_NAME (stays in sync with the API env var)', async () => {
+    vi.resetModules();
+    vi.stubEnv('SESSION_COOKIE_NAME', 'custom_session');
+    const { middleware: m } = await import('./middleware');
+
+    const authed = m(makeRequest('/en/dashboard', 'custom_session=abc123'));
+    expect(authed.headers.get('location')).toBeNull();
+
+    const gated = m(makeRequest('/en/dashboard', 'pg_session=abc123'));
+    expect(gated.status).toBe(307);
+    expect(gated.headers.get('location')).toContain('/login');
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 });

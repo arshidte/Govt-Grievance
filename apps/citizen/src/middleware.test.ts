@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware } from './middleware';
 
@@ -95,5 +95,24 @@ describe('middleware', () => {
     const location = res.headers.get('location');
     // Only the locale-redirect should fire here, never a /login redirect.
     if (location) expect(location).not.toContain('/login');
+  });
+
+  it('honors a configured SESSION_COOKIE_NAME (stays in sync with the API env var)', async () => {
+    // The presence-gate must key off the SAME cookie name the API sets. With
+    // a custom SESSION_COOKIE_NAME, a request carrying THAT cookie is authed
+    // and one carrying the old default name is gated.
+    vi.resetModules();
+    vi.stubEnv('SESSION_COOKIE_NAME', 'custom_session');
+    const { middleware: m } = await import('./middleware');
+
+    const authed = m(makeRequest('/en/home', 'custom_session=abc123'));
+    expect(authed.headers.get('location')).toBeNull();
+
+    const gated = m(makeRequest('/en/home', 'pg_session=abc123'));
+    expect(gated.status).toBe(307);
+    expect(gated.headers.get('location')).toContain('/login');
+
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 });

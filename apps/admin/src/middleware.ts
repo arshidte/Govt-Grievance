@@ -12,7 +12,16 @@ import { defaultLocale, locales } from '@pg/i18n';
  * name. Mirrors the citizen app's middleware.ts exactly (same cookie name,
  * same locale-prefix strategy) — see that file for the fuller rationale.
  */
-const SESSION_COOKIE_NAME = 'pg_session';
+/**
+ * Session cookie name. Read from `SESSION_COOKIE_NAME` — the SAME env var the
+ * API's `env.ts` uses — so overriding it keeps the API and this middleware's
+ * presence-gate in sync; defaults to `pg_session` (env.ts's own default).
+ * NOTE: Next inlines `process.env.*` into middleware at BUILD time, so to use
+ * a non-default name this var must be set when BUILDING the app and must match
+ * the API's configured value. (This check is UX-only; the backend remains the
+ * authoritative auth layer regardless.)
+ */
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'pg_session';
 
 /**
  * Public routes that never require a session cookie. Unlike the citizen
