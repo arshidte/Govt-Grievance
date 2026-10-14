@@ -58,10 +58,23 @@ describe('middleware', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 
+  it('passes through /verify without a session cookie (Task 26 — reached before the cookie is set)', () => {
+    const req = makeRequest('/en/verify');
+    const res = middleware(req);
+    expect(res.headers.get('location')).toBeNull();
+  });
+
   it('GATES a /login-prefixed sibling route (segment match, not bare prefix)', () => {
     // `/login-help` must NOT be treated as public just because it starts
     // with `/login` — an unauthenticated request should be gated to /login.
     const req = makeRequest('/en/login-help');
+    const res = middleware(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it('GATES a /verify-prefixed sibling route (segment match, not bare prefix)', () => {
+    const req = makeRequest('/en/verify-something');
     const res = middleware(req);
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');

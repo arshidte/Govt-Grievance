@@ -17,8 +17,11 @@ const SESSION_COOKIE_NAME = 'pg_session';
 /**
  * Public routes that never require a session cookie. Unlike the citizen
  * app, the admin app has no public landing/track/register flow — `/login`
- * is the only route reachable without a session. Any NEW public route
- * added later must be added here or it will be gated below.
+ * and `/verify` (Task 26's OTP login flow) are the only routes reachable
+ * without a session. Without this, `/login` itself would be gated by the
+ * check below, producing a redirect loop (unauthenticated -> redirect to
+ * /login -> /login gated -> redirect to /login -> ...). Any NEW public
+ * route added later must be added here or it will be gated below.
  */
 const PUBLIC_PATHS = new Set<string>([]);
 
@@ -40,12 +43,15 @@ function stripLocalePrefix(pathname: string): string {
 
 function isPublicPath(pathname: string): boolean {
   const unprefixed = stripLocalePrefix(pathname);
-  // Segment match for /login (not a bare prefix) so sibling routes like
-  // `/login-help` / `/loginassistant` are NOT silently treated as public.
+  // Segment match for /login and /verify (not a bare prefix) so sibling
+  // routes like `/login-help` / `/loginassistant` / `/verify-something`
+  // are NOT silently treated as public.
   return (
     PUBLIC_PATHS.has(unprefixed) ||
     unprefixed === '/login' ||
-    unprefixed.startsWith('/login/')
+    unprefixed.startsWith('/login/') ||
+    unprefixed === '/verify' ||
+    unprefixed.startsWith('/verify/')
   );
 }
 
