@@ -39,6 +39,19 @@ const envSchema = z.object({
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: z.coerce.number().int().positive().default(5),
   SMS_PROVIDER: z.string().min(1).default('mock'),
+}).superRefine((e, ctx) => {
+  // Fail closed: the in-memory mock SMS provider must never run in
+  // production. SMS_PROVIDER defaults to 'mock', so an unset value in a
+  // production deploy would otherwise silently ship a non-delivering
+  // provider that also retains codes in memory. Reject it at boot.
+  if (e.NODE_ENV === 'production' && e.SMS_PROVIDER === 'mock') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['SMS_PROVIDER'],
+      message:
+        'SMS_PROVIDER must not be "mock" in production — configure a real SMS provider.',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
