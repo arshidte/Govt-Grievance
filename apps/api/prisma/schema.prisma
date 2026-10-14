@@ -83,7 +83,12 @@ model RoleAssignment {
   grantedBy   String?
   createdAt   DateTime   @default(now())
 
-  @@unique([userId, role, panchayatId, wardId])
+  // Uniqueness + role<->scope coherence are enforced by PARTIAL unique
+  // indexes and a CHECK constraint (raw SQL, not expressible in Prisma
+  // schema) — see migration 20261015000000_roleassignment_integrity. A plain
+  // `@@unique([userId, role, panchayatId, wardId])` is INEFFECTIVE here
+  // because PostgreSQL treats NULL scope columns as distinct, so it is
+  // intentionally omitted in favour of the partial indexes.
 }
 
 model Panchayat {
