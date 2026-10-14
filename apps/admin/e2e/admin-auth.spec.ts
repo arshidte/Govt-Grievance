@@ -1,14 +1,15 @@
 /**
  * Admin staff-gate e2e spec (Task 25; the staff-login-succeeds leg is
- * added in Task 26, now that the real login/verify forms exist).
+ * added in Task 26, now that the real login/verify forms exist; the
+ * responsive nav shell legs are added in Task 27).
  *
  * EXECUTION DEFERRED TO TASK 28 (ruling R15): no Playwright config, browser
  * binaries, or test runner wiring exist in this repo yet — that setup is
  * explicitly Task 28's responsibility. This file is AUTHORED now (per the
  * brief) against stable `data-testid` selectors already present in the
- * implemented pages/layouts, but it is NOT run as part of Task 25/26's
- * verification. Do not add `@playwright/test` to package.json or attempt
- * to run this from this task — that would pre-empt T28's setup.
+ * implemented pages/layouts/components, but it is NOT run as part of Task
+ * 25/26/27's verification. Do not add `@playwright/test` to package.json
+ * or attempt to run this from this task — that would pre-empt T28's setup.
  *
  * Flow covered (Review Focus #4):
  *  1. (T25) An unauthenticated visit to `/` redirects to `/login`.
@@ -23,6 +24,13 @@
  *     dev-only OTP via `GET /api/v1/dev/last-otp`) and lands on the
  *     dashboard `/`, proving the post-verify `/` navigation + the
  *     `requireStaff` gate's "allow" path both work end to end.
+ *  4. (T27) At a `<lg` viewport, the persistent Sidebar (`Sidebar.tsx`,
+ *     `hidden lg:flex`) is absent and the drawer trigger
+ *     (`mobile-drawer-trigger`) is present; clicking it opens the
+ *     `mobile-drawer` dialog (`aria-expanded` flips, ESC/overlay-click
+ *     close it).
+ *  5. (T27) Clicking a nav item (desktop sidebar or drawer) routes to that
+ *     module's page and marks it `aria-current="page"` (`nav-link-<key>`).
  */
 import { expect, test } from '@playwright/test';
 
@@ -120,5 +128,89 @@ test.describe('admin staff gate', () => {
     // because `requireStaff` allows the COORDINATOR role.
     await expect(page).toHaveURL(new RegExp(`${baseURL}/en/?$`));
     await expect(page.getByTestId('admin-dashboard-page')).toBeVisible();
+  });
+});
+
+/** Drives the same login/verify flow as the test above, landing an authenticated COORDINATOR session on `/`. Shared by the T27 nav-shell specs below so each test doesn't repeat the OTP dance. */
+async function loginAsSeededCoordinator(page: import('@playwright/test').Page, baseURL: string) {
+  await page.goto('/login');
+  await page.getByTestId('login-phone-input').fill(SEEDED_COORDINATOR_PHONE);
+  await page.getByTestId('login-submit').click();
+  await expect(page).toHaveURL(/\/verify\?phone=/);
+
+  const lastOtpResponse = await page.request.get(
+    `${baseURL}/api/v1/auth/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
+  );
+  const { code } = (await lastOtpResponse.json()) as { code: string };
+  for (let i = 0; i < code.length; i += 1) {
+    await page.getByLabel(`Digit ${i + 1} of 6`).fill(code[i] as string);
+  }
+  await expect(page.getByTestId('admin-dashboard-page')).toBeVisible();
+}
+
+test.describe('admin responsive nav shell (T27)', () => {
+  test.use({ viewport: { width: 375, height: 812 } }); // <lg: drawer, not persistent sidebar
+
+  test('at <lg width, the sidebar is replaced by a toggleable drawer', async ({ page, baseURL }) => {
+    await loginAsSeededCoordinator(page, baseURL!);
+
+    // Persistent sidebar is `hidden lg:flex` — not visible below `lg`.
+    await expect(page.getByTestId('admin-sidebar')).toBeHidden();
+
+    const trigger = page.getByTestId('mobile-drawer-trigger');
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('mobile-drawer')).toHaveCount(0);
+
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('mobile-drawer')).toBeVisible();
+
+    // ESC closes the drawer and returns focus to the trigger.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('mobile-drawer')).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    // Clicking the overlay also closes it.
+    await trigger.click();
+    await page.getByTestId('mobile-drawer-overlay').click({ position: { x: 350, y: 10 } });
+    await expect(page.getByTestId('mobile-drawer')).toHaveCount(0);
+  });
+
+  test('clicking a nav item in the drawer routes and highlights it, then closes the drawer', async ({
+    page,
+    baseURL,
+  }) => {
+    await loginAsSeededCoordinator(page, baseURL!);
+
+    await page.getByTestId('mobile-drawer-trigger').click();
+    await page.getByTestId('nav-link-issues').click();
+
+    await expect(page).toHaveURL(/\/issues$/);
+    await expect(page.getByTestId('admin-issues-page')).toBeVisible();
+    // Drawer closes on navigation.
+    await expect(page.getByTestId('mobile-drawer')).toHaveCount(0);
+
+    // Re-open and confirm the active item carries aria-current="page".
+    await page.getByTestId('mobile-drawer-trigger').click();
+    await expect(page.getByTestId('nav-link-issues')).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+test.describe('admin responsive nav shell — desktop (T27)', () => {
+  test('at >=lg width, the sidebar is persistent and clicking a nav item highlights the active route', async ({
+    page,
+    baseURL,
+  }) => {
+    await loginAsSeededCoordinator(page, baseURL!);
+
+    await expect(page.getByTestId('admin-sidebar')).toBeVisible();
+    await expect(page.getByTestId('mobile-drawer-trigger')).toBeHidden();
+
+    await page.getByTestId('admin-sidebar').getByTestId('nav-link-issues').click();
+    await expect(page).toHaveURL(/\/issues$/);
+    await expect(page.getByTestId('nav-link-issues')).toHaveAttribute('aria-current', 'page');
+    // A non-active item carries no aria-current.
+    await expect(page.getByTestId('nav-link-dashboard')).not.toHaveAttribute('aria-current', 'page');
   });
 });

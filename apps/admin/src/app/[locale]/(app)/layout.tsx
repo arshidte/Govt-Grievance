@@ -3,14 +3,17 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ApiClientError } from '@pg/api-client';
 import { ForbiddenState } from '@pg/ui';
+import { MobileDrawer } from '../../../components/MobileDrawer';
+import { Sidebar } from '../../../components/Sidebar';
 import { api } from '../../../lib/api';
 import { requireStaff } from '../../../lib/requireStaff';
 
 /**
- * Authed shell layout for the `(app)` route group (the future admin
- * dashboard — T27). Route groups don't affect the URL, so this adds no new
- * segment; it wraps every route under it with the SERVER-side staff gate
- * (Review Focus #4).
+ * Authed shell layout for the `(app)` route group — the admin dashboard
+ * (T27). Route groups don't affect the URL, so this adds no new segment;
+ * it wraps every route under it with the SERVER-side staff gate (Review
+ * Focus #4), and, once that gate passes, the responsive sidebar/drawer
+ * shell (T27) around `children`.
  *
  * `middleware.ts` only checks COOKIE PRESENCE (it cannot see roles — they
  * aren't in the cookie), so two distinct failure modes are handled HERE,
@@ -31,6 +34,12 @@ import { requireStaff } from '../../../lib/requireStaff';
  * it propagates to Next's nearest error boundary, since silently treating
  * every failure as "forbidden" or "logged out" would hide real backend
  * problems behind a misleading UI state.
+ *
+ * Once `requireStaff` passes, `me.roles` (already fetched for the gate) is
+ * passed DOWN as props to the client `Sidebar`/`MobileDrawer` for their
+ * `can()`-based nav filtering. This deliberately avoids a client-side
+ * `useMe` round-trip (the data is already in hand) and any new admin BFF
+ * surface — there is no reason to re-fetch what this layout already has.
  */
 export default async function AuthedLayout({
   children,
@@ -64,5 +73,18 @@ export default async function AuthedLayout({
     );
   }
 
-  return <>{children}</>;
+  const tCommon = await getTranslations({ locale, namespace: 'common' });
+
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <Sidebar roles={me.roles} />
+      <div className="flex flex-1 flex-col">
+        <header className="flex items-center gap-2 border-b border-neutral-200 bg-white p-4 lg:hidden">
+          <MobileDrawer roles={me.roles} />
+          <span className="text-sm font-semibold text-neutral-900">{tCommon('appName')}</span>
+        </header>
+        <main className="flex-1 p-4 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
 }

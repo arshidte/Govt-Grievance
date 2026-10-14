@@ -166,6 +166,30 @@
     "loginTitle": "Staff sign in",
     "loginSubtitle": "Sign in with your mobile number to access the admin console.",
     "forbiddenTitle": "Access denied",
-    "forbiddenDescription": "Your account does not have staff access to the admin console."
+    "forbiddenDescription": "Your account does not have staff access to the admin console.",
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "An overview of activity across your panchayats.",
+      "openIssues": "Open issues",
+      "escalatedIssues": "Escalated issues",
+      "resolvedThisMonth": "Resolved this month",
+      "pendingCitizens": "Pending registrations",
+      "emptyTitle": "No data yet",
+      "emptyDescription": "Dashboard data arrives in later milestones."
+    },
+    "modules": {
+      "issuesDescription": "Case management for citizen-reported issues arrives in a later milestone.",
+      "panchayatsDescription": "Panchayat directory and management arrives in a later milestone.",
+      "wardsDescription": "Ward directory and management arrives in a later milestone.",
+      "representativesDescription": "Representative directory and management arrives in a later milestone.",
+      "coordinatorsDescription": "Coordinator directory and management arrives in a later milestone.",
+      "citizensDescription": "Citizen directory arrives in a later milestone.",
+      "categoriesDescription": "Issue category management arrives in a later milestone.",
+      "escalationsDescription": "Escalation tracking arrives in a later milestone.",
+      "notificationsDescription": "Notification management arrives in a later milestone.",
+      "reportsDescription": "Reporting and analytics arrive in a later milestone.",
+      "settingsDescription": "Platform settings arrive in a later milestone.",
+      "auditLogsDescription": "Audit log history arrives in a later milestone."
+    }
   }
 }
