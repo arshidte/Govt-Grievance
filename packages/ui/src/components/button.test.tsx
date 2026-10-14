@@ -73,4 +73,41 @@ describe('Button', () => {
 
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
   });
+
+  describe('asChild (Radix Slot)', () => {
+    // Regression: `asChild` renders through Radix `Slot`, which throws
+    // "Expected a single React element child" if the Button passes it more
+    // than one child. The Button used to always emit `{loading && <Spinner/>}`
+    // + `{children}` (two children), crashing every `<Button asChild>` at
+    // render — e.g. the citizen landing page's `<Button asChild><Link/></Button>`
+    // CTAs. These assert the single-child contract holds.
+    it('renders a single-element child through Slot without crashing', () => {
+      render(
+        <Button asChild>
+          <a href="/x">Go</a>
+        </Button>,
+      );
+
+      const link = screen.getByRole('link', { name: 'Go' });
+      expect(link).toBeInstanceOf(HTMLAnchorElement);
+      // Button props are merged onto the child (variant/base classes).
+      expect(link.className).toMatch(/min-h-11/);
+      // No stray <button> was rendered.
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('does not crash with asChild + loading, and omits the spinner on the slotted child', () => {
+      render(
+        <Button asChild loading>
+          <a href="/x">Go</a>
+        </Button>,
+      );
+
+      const link = screen.getByRole('link', { name: 'Go' });
+      expect(link).toHaveAttribute('aria-busy', 'true');
+      // Spinner is a second child Slot can't accept — it must not be rendered
+      // in the asChild path.
+      expect(screen.queryByTestId('button-spinner')).not.toBeInTheDocument();
+    });
+  });
 });

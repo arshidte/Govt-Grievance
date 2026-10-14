@@ -96,8 +96,21 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         {...props}
       >
-        {loading && <Spinner />}
-        {children}
+        {asChild ? (
+          // Radix `Slot` requires EXACTLY ONE React element child and clones
+          // the caller's element (e.g. a `next/link` `<Link>`), merging these
+          // props onto it. The loading spinner is a second child, which Slot
+          // rejects ("Expected a single React element child"), so it is only
+          // rendered in the real-`<button>` path below. A polymorphic
+          // `asChild` button (typically a link) does not surface a spinner;
+          // `aria-busy`/`aria-disabled` are still applied to the cloned child.
+          children
+        ) : (
+          <>
+            {loading && <Spinner />}
+            {children}
+          </>
+        )}
       </Comp>
     );
   },
