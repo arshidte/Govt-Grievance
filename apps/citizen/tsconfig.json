@@ -18,11 +18,6 @@
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": [
     "node_modules",
-    ".next",
-    // Playwright spec authored in T23; execution + Playwright dependency +
-    // tsconfig wiring are deferred to T28 (ruling R15) — see
-    // e2e/citizen-auth.spec.ts's header comment. Excluded from typecheck
-    // here for the same reason it's excluded from vitest (vitest.config.ts).
-    "e2e"
+    ".next"
   ]
 }

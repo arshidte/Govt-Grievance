@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Override the shared base's ESM settings (module: ESNext,
+    // moduleResolution: Bundler) for THIS build only. `@pg/api`'s `nest
+    // build` emits CommonJS (`apps/api/tsconfig.json` sets `module:
+    // CommonJS`), and its built `dist/main.js` is loaded by plain
+    // `node dist/main.js` with no ESM loader/package `"type": "module"` —
+    // so it resolves workspace deps via `require()`. Emitting `@pg/types`
+    // as CommonJS here lets that `require('@pg/types')` resolve a real,
+    // already-compiled `.js` file instead of raw TypeScript source (which
+    // Node cannot load at runtime — this was the production-boot bug this
+    // build exists to fix). Bundler-based consumers (Next's
+    // `transpilePackages`, Vitest/Vite) read `main`/`types` the same way
+    // regardless of whether the file underneath is ESM or CJS, so they
+    // are unaffected by this override.
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "declaration": true,
+    "declarationMap": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

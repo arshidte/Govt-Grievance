@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Mirrors `.env.example` / `docker-compose.dev.yml` (Postgres on host port
+  # 5435) so this single DATABASE_URL works unchanged whether a developer
+  # points at the GH Actions `postgres` service below (same port mapping)
+  # or `docker compose -f docker-compose.dev.yml up` locally.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5435/panchayat?schema=public
+  API_PORT: 4000
+  CORS_ORIGIN_CITIZEN: http://localhost:3000
+  CORS_ORIGIN_ADMIN: http://localhost:3001
+  SESSION_COOKIE_NAME: pg_session
+  SESSION_TTL_HOURS: 720
+  OTP_TTL_SECONDS: 300
+  OTP_MAX_ATTEMPTS: 5
+  OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: 5
+  SMS_PROVIDER: mock
+  API_INTERNAL_URL: http://localhost:4000
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # Same image/credentials as docker-compose.dev.yml's `postgres` service
+    # (postgres:16, user/password/db = postgres/postgres/panchayat),
+    # reusing that file's config rather than diverging from it. Mapped to
+    # host port 5435 to match DATABASE_URL above and .env.example.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: panchayat
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d panchayat"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Node version
+        id: node-version
+        run: echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: package.json
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma migrate deploy
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed database
+        working-directory: apps/api
+        run: pnpm exec prisma db seed
+
+      - name: Lint, typecheck, test, build
+        run: pnpm turbo run lint typecheck test build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @pg/citizen exec playwright install --with-deps chromium
+
+      - name: Run e2e suites
+        run: pnpm test:e2e
