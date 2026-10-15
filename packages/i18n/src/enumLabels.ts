@@ -1,8 +1,8 @@
-import type { Role } from '@pg/types';
+import type { Priority, Role } from '@pg/types';
 
 export const roleLabelKey = (r: Role) => `role.${r.toLowerCase()}`;
 
-export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type { Priority };
 export const priorityLabelKey = (p: Priority) => `priority.${p.toLowerCase()}`;
 
 const STATUS_KEY: Record<string, string> = {

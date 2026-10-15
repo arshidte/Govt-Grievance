@@ -1,24 +1,15 @@
 import { statusLabelKey } from '@pg/i18n';
+import type { IssueStatus } from '@pg/types';
 import * as React from 'react';
 import { cn } from '../lib/cn';
 
 /**
  * The 10 canonical grievance statuses (UPPER_SNAKE, as stored/transmitted).
- * Kept local (not imported from @pg/types) since no shared `Status` enum
- * exists yet there — @pg/i18n's STATUS_KEY map is the parallel source of
- * truth for the UPPER_SNAKE -> message-key mapping.
+ * Re-exported here (rather than requiring every consumer to import from
+ * @pg/types directly) so existing `Status`-typed call sites keep working
+ * unchanged; @pg/types is now the single source of truth for the member set.
  */
-export type Status =
-  | 'SUBMITTED'
-  | 'ACKNOWLEDGED'
-  | 'UNDER_REVIEW'
-  | 'ASSIGNED'
-  | 'IN_PROGRESS'
-  | 'WAITING_FOR_INFORMATION'
-  | 'ESCALATED'
-  | 'RESOLVED'
-  | 'CLOSED'
-  | 'REOPENED';
+export type Status = IssueStatus;
 
 export interface StatusBadgeProps {
   status: Status;
