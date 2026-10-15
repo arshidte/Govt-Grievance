@@ -31,7 +31,7 @@ Failure modes the spec implies that no happy-path task fully exercises — each 
 
 1. **Concurrent same-idempotency-key submissions** must yield exactly one issue; the DB-unique loser is caught and returns the original result (not a 500), and an expired key is treated as new — pinned in Task 9.
 2. **Rate-limit / audit resilience:** when the rate-limit check backend is unavailable the on-behalf path **fails closed** (deny, not allow), and every rejected/denied attempt is audited with the citizen phone **masked** and no profile fields — pinned in Task 12.
-3. **Migration against populated legacy data:** a pre-M2 `IssueStatusHistory` row survives with `fromStatus=toStatus=old status`, `changedById IS NULL`, old `status` column dropped, zero rows lost — pinned in Task 3.
+3. **Migration against populated legacy data:** all ten known `IssueStatusHistory.status` values map directly; an **unknown** legacy value falls back to `SUBMITTED` with the original preserved in `note` (migration does not fail, no row lost); `changedById IS NULL`; old `status` column dropped; and the reference sequence is seeded above any pre-existing reference so generated refs cannot collide — pinned in Task 3.
 4. **Failed attachment cleanup:** when the compensating delete fails after a DB error, the orphan is logged (ERROR + storageKey) and is **never downloadable** (no DB row → 404), and the client still gets the original error — pinned in Task 15.
 5. **Concurrent status transitions:** two racing valid transitions resolve to exactly one winner (one history row, one notification) + one `409 stale_status`; no duplicate side effects — pinned in Task 10.
 6. **Cross-app citizen visibility:** a status change made through the real staff **UI** appears in the citizen's timeline **and** as a notification — pinned in Task 24 (Playwright).
@@ -155,6 +155,42 @@ it('preserves legacy IssueStatusHistory rows and nulls the legacy actor', async 
     `SELECT column_name FROM information_schema.columns WHERE table_name='IssueStatusHistory'`);
   expect(cols.map((c:any)=>c.column_name)).not.toContain('status');
 });
+
+it('maps ALL TEN known legacy status values directly (from=to=value, note NULL)', async () => {
+  // At M1 head, insert one IssueStatusHistory row per known status value, then migrate.
+  const known = ['SUBMITTED','ACKNOWLEDGED','UNDER_REVIEW','ASSIGNED','IN_PROGRESS',
+    'WAITING_FOR_INFORMATION','ESCALATED','RESOLVED','CLOSED','REOPENED'];
+  // (helper seeds the FK graph + one history row per value with the legacy `status`)
+  await seedLegacyHistoryRows(known);
+  await runM2Migration();
+  const rows = await db.$queryRawUnsafe<any[]>(
+    `SELECT "fromStatus","toStatus","note" FROM "IssueStatusHistory" ORDER BY "createdAt"`);
+  expect(rows).toHaveLength(known.length);
+  for (let i = 0; i < known.length; i++) {
+    expect(rows[i].fromStatus).toBe(known[i]);
+    expect(rows[i].toStatus).toBe(known[i]);
+    expect(rows[i].note).toBeNull();
+  }
+});
+
+it('safely handles an UNKNOWN legacy status: falls back to SUBMITTED and preserves the original in note (no row lost, migration does not fail)', async () => {
+  await seedLegacyHistoryRows(['WEIRD_OLD_VALUE']);
+  await expect(runM2Migration()).resolves.not.toThrow();
+  const rows = await db.$queryRawUnsafe<any[]>(
+    `SELECT "fromStatus","toStatus","note" FROM "IssueStatusHistory"`);
+  expect(rows).toHaveLength(1);
+  expect(rows[0].toStatus).toBe('SUBMITTED');
+  expect(rows[0].fromStatus).toBe('SUBMITTED');
+  expect(rows[0].note).toBe('migrated: unrecognized legacy status "WEIRD_OLD_VALUE"');
+});
+
+it('seeds the reference sequence ABOVE any pre-existing reference so generated refs cannot collide', async () => {
+  // Insert a pre-existing Issue with a high numeric suffix BEFORE the M2 migration.
+  await seedLegacyIssue({ referenceNo: 'GRV-2026-000005' });
+  await runM2Migration();
+  const next = await db.$queryRawUnsafe<any[]>(`SELECT nextval('issue_reference_seq') AS n`);
+  expect(Number(next[0].n)).toBeGreaterThan(5); // i.e. 6 -> GRV-YYYY-000006, never 000005
+});
 ```
 - [ ] **Step 2: Run** → FAIL (no M2 migration yet).
 - [ ] **Step 3: Author `migration.sql`** using expand→backfill→contract:
@@ -170,7 +206,14 @@ ALTER TABLE "Issue" ALTER COLUMN "title" DROP DEFAULT, ALTER COLUMN "description
 ALTER TABLE "Issue" ADD CONSTRAINT "Issue_subcategoryId_fkey" FOREIGN KEY ("subcategoryId") REFERENCES "Subcategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 -- IssueStatusHistory: expand -> backfill -> contract
 ALTER TABLE "IssueStatusHistory" ADD COLUMN "changedById" TEXT, ADD COLUMN "fromStatus" "IssueStatus", ADD COLUMN "toStatus" "IssueStatus", ADD COLUMN "note" TEXT;
-UPDATE "IssueStatusHistory" SET "toStatus" = "status"::"IssueStatus", "fromStatus" = "status"::"IssueStatus";
+-- Backfill. The legacy "status" was a free String. KNOWN values (the 10 IssueStatus
+-- members) map directly to from/toStatus. UNKNOWN values (anything else) fall back
+-- to 'SUBMITTED' and the raw original is preserved verbatim in "note" so nothing is
+-- lost. changedById stays NULL (legacy actor genuinely unknown — never fabricated).
+UPDATE "IssueStatusHistory" h SET
+  "toStatus"   = (CASE WHEN h."status" IN ('SUBMITTED','ACKNOWLEDGED','UNDER_REVIEW','ASSIGNED','IN_PROGRESS','WAITING_FOR_INFORMATION','ESCALATED','RESOLVED','CLOSED','REOPENED') THEN h."status"::"IssueStatus" ELSE 'SUBMITTED'::"IssueStatus" END),
+  "fromStatus" = (CASE WHEN h."status" IN ('SUBMITTED','ACKNOWLEDGED','UNDER_REVIEW','ASSIGNED','IN_PROGRESS','WAITING_FOR_INFORMATION','ESCALATED','RESOLVED','CLOSED','REOPENED') THEN h."status"::"IssueStatus" ELSE 'SUBMITTED'::"IssueStatus" END),
+  "note"       = (CASE WHEN h."status" IN ('SUBMITTED','ACKNOWLEDGED','UNDER_REVIEW','ASSIGNED','IN_PROGRESS','WAITING_FOR_INFORMATION','ESCALATED','RESOLVED','CLOSED','REOPENED') THEN NULL ELSE 'migrated: unrecognized legacy status "' || h."status" || '"' END);
 ALTER TABLE "IssueStatusHistory" ALTER COLUMN "fromStatus" SET NOT NULL, ALTER COLUMN "toStatus" SET NOT NULL;
 ALTER TABLE "IssueStatusHistory" DROP COLUMN "status";
 ALTER TABLE "IssueStatusHistory" ADD CONSTRAINT "IssueStatusHistory_changedById_fkey" FOREIGN KEY ("changedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -184,8 +227,16 @@ ALTER TABLE "Notification" ALTER COLUMN "type" DROP DEFAULT;
 CREATE UNIQUE INDEX "Notification_statusHistoryId_key" ON "Notification"("statusHistoryId");
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_statusHistoryId_fkey" FOREIGN KEY ("statusHistoryId") REFERENCES "IssueStatusHistory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 CREATE UNIQUE INDEX "notification_one_submitted_per_issue" ON "Notification"("issueId") WHERE "type" = 'issue.submitted';
--- reference-number sequence (global, non-resetting)
+-- reference-number sequence (global, non-resetting). Seed it ABOVE any existing
+-- reference's numeric suffix so a generated ref can never collide with a
+-- pre-existing Issue.referenceNo. On a real (empty) M1 DB MAX is 0 -> starts at 1.
+-- is_called=false means the next nextval() returns exactly the seeded value.
+-- Issue.referenceNo @unique remains the hard backstop regardless.
 CREATE SEQUENCE "issue_reference_seq" START 1;
+SELECT setval('issue_reference_seq',
+  GREATEST(1, (SELECT COALESCE(MAX(CAST(split_part("referenceNo", '-', 3) AS BIGINT)), 0) + 1
+               FROM "Issue" WHERE "referenceNo" ~ '^GRV-[0-9]{4}-[0-9]+$')),
+  false);
 ```
   (Note: the empty-string defaults are transient scaffolding so the columns can be `NOT NULL` on a populated table, then the default is dropped; a real M1 DB is empty so no row is affected. Document this inline.)
 - [ ] **Step 4: Run** the migration test → PASS; also run `prisma migrate deploy` on the dev DB.
@@ -320,24 +371,59 @@ it('isolates issues to their owner', async () => {
 - Modify: `apps/api/src/common/idempotency/idempotency.service.ts`
 - Test: `apps/api/test/idempotency-concurrency.e2e-spec.ts`
 
-- [ ] **Step 1: Write failing e2e** — fire two concurrent `POST /issues` with the **same** `Idempotency-Key` + same payload; assert exactly one issue is created and both responses carry the same `referenceNo`; then assert an expired key (manually age the row past 24h) is treated as new.
+- [ ] **Step 1a: Confirm the uniqueness constraint.** Assert the DB enforces `@@unique([userId, route, key])` (defined in Task 6) so the race has a single authoritative arbiter — a direct double-insert of the same triple raises Prisma `P2002`.
 ```ts
-it('two concurrent same-key submissions create exactly one issue', async () => {
+it('enforces DB uniqueness on (userId, route, key)', async () => {
+  const row = { userId: 'u1', route: 'POST /issues', key: 'k', fingerprint: 'f', responseJson: {} };
+  await prisma.idempotencyKey.create({ data: row });
+  await expect(prisma.idempotencyKey.create({ data: { ...row, fingerprint: 'f2' } }))
+    .rejects.toMatchObject({ code: 'P2002' });
+});
+```
+- [ ] **Step 1b: Write failing concurrency e2e — SAME key + IDENTICAL payload → exactly one issue.**
+```ts
+it('two concurrent same-key+same-payload submissions create exactly one issue', async () => {
   const { cookie } = await loginCitizen(app, '+919000010010');
   const [a, b] = await Promise.all([
     post(app, '/api/v1/issues', validBody, cookie, { 'Idempotency-Key': 'dup-1' }),
     post(app, '/api/v1/issues', validBody, cookie, { 'Idempotency-Key': 'dup-1' }),
   ]);
-  const refs = [a.body.referenceNo, b.body.referenceNo].filter(Boolean);
-  expect(new Set(refs).size).toBe(1);
-  const count = await countIssues(cookie);
-  expect(count).toBe(1);
-});
-it('treats an expired key as new', async () => {
-  // insert then backdate the IdempotencyKey row > 24h, re-POST same key -> new issue
+  // both succeed (200/201) and carry the SAME referenceNo; exactly one row exists.
+  expect([a.status, b.status].every((s) => s < 400)).toBe(true);
+  expect(a.body.referenceNo).toBe(b.body.referenceNo);
+  expect(await countIssues(cookie)).toBe(1);
 });
 ```
-- [ ] **Step 2: Run** → FAIL (race creates two issues or 500s on unique violation). **Step 3: Implement** the race handling: the `IdempotencyKey` insert uses the `@@unique([userId,route,key])`; on a unique-violation (`P2002`) the loser **re-reads** the winning row and returns its stored response (not a 500); reads treat rows older than the 24h TTL as absent. **Step 4: Run** → PASS. **Step 5: Commit** `fix(api): idempotency safe under concurrent same-key submissions`.
+- [ ] **Step 1c: Write failing concurrency e2e — SAME key + DIFFERENT payload → one issue + one 409, never two.**
+```ts
+it('two concurrent same-key+different-payload submissions yield one create and one 409 (no second issue)', async () => {
+  const { cookie } = await loginCitizen(app, '+919000010011');
+  const [a, b] = await Promise.all([
+    post(app, '/api/v1/issues', { ...validBody, title: 'A' }, cookie, { 'Idempotency-Key': 'dup-2' }),
+    post(app, '/api/v1/issues', { ...validBody, title: 'B' }, cookie, { 'Idempotency-Key': 'dup-2' }),
+  ]);
+  const statuses = [a.status, b.status].sort();
+  expect(statuses[0]).toBeLessThan(400);     // one winner created
+  expect(statuses[1]).toBe(409);             // the other: idempotency_key_conflict
+  expect(await countIssues(cookie)).toBe(1); // never two
+});
+```
+- [ ] **Step 1d: Write failing e2e — EXPIRED key behaves as new even if the purge job has not run.**
+```ts
+it('treats an expired key as new at read time, independent of scheduled cleanup', async () => {
+  const { cookie } = await loginCitizen(app, '+919000010012');
+  const first = await post(app, '/api/v1/issues', validBody, cookie, { 'Idempotency-Key': 'ttl-1' });
+  // Backdate the key row > 24h WITHOUT running any purge job.
+  await prisma.idempotencyKey.updateMany({
+    where: { key: 'ttl-1' },
+    data: { createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000) },
+  });
+  const second = await post(app, '/api/v1/issues', validBody, cookie, { 'Idempotency-Key': 'ttl-1' });
+  expect(second.body.referenceNo).not.toBe(first.body.referenceNo); // new issue, not a replay
+  expect(await countIssues(cookie)).toBe(2);
+});
+```
+- [ ] **Step 2: Run** → FAIL (race creates two issues / 500s on P2002 / stale key replays). **Step 3: Implement** the race + TTL handling in `IdempotencyService.run`: attempt the work + key insert in a transaction; on `P2002` the loser **re-reads** the winning row — if its `fingerprint` matches, return the stored response (replay, not a 500); if it differs, throw `ApiError('idempotency_key_conflict', 409, ...)`. All reads/lookups treat a row with `createdAt < now - 24h` as **absent** (read-time TTL), so an expired key is a fresh create regardless of whether the purge job has run. **Step 4: Run** → PASS. **Step 5: Commit** `fix(api): idempotency safe under concurrent same-key submissions + read-time TTL`.
 
 ---
 
@@ -421,7 +507,37 @@ it('rate-limits per representative (429 past the cap) and audits each limited at
   for (let i=0;i<CAP;i++) await svc.create(repWardA, { ...dto, citizenPhone:`+9190000210${i}` });
   await expect(svc.create(repWardA, { ...dto, citizenPhone:'+919000021099' })).rejects.toMatchObject({ status: 429 });
 });
-it('citizen owns the issue + is the notification recipient; rep cannot read citizen profile', async () => { /* ... */ });
+it('makes the citizen the owner + notification recipient; the rep is only the creator', async () => {
+  const phone = '+919000020050';
+  const res = await svc.create(repWardA, { ...dto, citizenPhone: phone });
+  // The persisted issue is owned by the resolved citizen, created by the rep, onBehalfOf=true.
+  const citizen = await prisma.user.findUniqueOrThrow({ where: { phone } });
+  const issue = await prisma.issue.findUniqueOrThrow({ where: { id: res.id } });
+  expect(issue.citizenId).toBe(citizen.id);
+  expect(issue.createdById).toBe(repWardA.id);
+  expect(issue.onBehalfOf).toBe(true);
+  // The submission notification is addressed to the CITIZEN, not the rep.
+  const notes = await prisma.notification.findMany({ where: { issueId: res.id, type: 'issue.submitted' } });
+  expect(notes).toHaveLength(1);
+  expect(notes[0].recipientId).toBe(citizen.id);
+  expect(notes[0].recipientId).not.toBe(repWardA.id);
+});
+
+it('does not give the rep access to the citizen profile or unrelated issues', async () => {
+  const phone = '+919000020051';
+  // The citizen pre-exists with a filled profile and an unrelated prior issue.
+  const citizen = await prisma.user.create({ data: { phone, fullName: 'Private Name', email: 'p@x.test' } });
+  const unrelated = await seedIssue({ citizenId: citizen.id, wardId: wardB.id });
+  const res = await svc.create(repWardA, { ...dto, citizenPhone: phone });
+  // The on-behalf response exposes no citizen profile field and no account-existence signal.
+  expect(res).not.toHaveProperty('fullName');
+  expect(res).not.toHaveProperty('email');
+  expect(res).not.toHaveProperty('citizenId');
+  expect(JSON.stringify(res)).not.toContain('Private Name');
+  // The rep's scoped issue list (ward A) does NOT surface the citizen's unrelated ward-B issue.
+  const repList = await issuesService.listFor(repWardA);
+  expect(repList.map((i) => i.id)).not.toContain(unrelated.id);
+});
 ```
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement** — rate limit via a DB-backed counter (reuse the OTP per-window count pattern) read inside a try/catch that throws `ApiError('rate_limit_unavailable',503,...)` on backend error (fail-closed) and audits the denial; scope check → audit on 403; upsert citizen by phone; transactional create; `AuditService.record` with `maskPhone` (reuse M1 helper). Response omits all citizen fields. **Step 4: Run** → PASS. **Step 5: Commit** `feat(api): on-behalf submission with rate-limit, audit, non-disclosure`.
 
@@ -473,7 +589,11 @@ it('rejects a non-image by content sniff even if the extension is .jpg', async (
   await expect(svc.upload(owner, issue.id, { buffer: Buffer.from('%PDF-1.7'), mimetype:'image/jpeg', originalname:'x.jpg', size: 8 }))
     .rejects.toMatchObject({ status: 415 });
 });
-it('rejects a file over 5MB', async () => { /* size = 5*1024*1024+1 -> 413 */ });
+it('rejects a file over 5MB with 413', async () => {
+  const tooBig = { buffer: Buffer.alloc(5 * 1024 * 1024 + 1, 0xff), mimetype: 'image/png',
+    originalname: 'big.png', size: 5 * 1024 * 1024 + 1 };
+  await expect(svc.upload(owner, issue.id, tooBig)).rejects.toMatchObject({ status: 413 });
+});
 it('on DB failure after file write, deletes the file; if delete also fails, logs ERROR and the orphan is not downloadable', async () => {
   store.put = vi.fn(async () => {});                 // file "written"
   prisma.attachment.create = vi.fn(async () => { throw new Error('db down'); });
@@ -484,7 +604,15 @@ it('on DB failure after file write, deletes the file; if delete also fails, logs
   // no Attachment row was created -> getStream cannot find it
   await expect(svc.getStream(owner, 'any')).rejects.toMatchObject({ status: 404 });
 });
-it('returns 404 when the DB row exists but the file is missing', async () => { /* ... */ });
+it('returns 404 attachment_unavailable when the DB row exists but the file is missing', async () => {
+  // Upload succeeds (row + file), then the underlying file disappears (ephemeral dev disk).
+  const dto = await svc.upload(owner, issue.id, validJpeg);
+  await store.delete(dto.storageKey); // simulate the file vanishing out from under the row
+  await expect(svc.getStream(owner, dto.id)).rejects.toMatchObject({
+    status: 404,
+    code: 'attachment_unavailable',
+  });
+});
 ```
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement** per spec §10 (sniff via magic bytes; `already_has_attachment` 409; write-file→create-row; `try{delete}catch{logger.error('orphan file left after failed cleanup',{storageKey,issueId})}` then rethrow original). **Step 4: Run** → PASS. **Step 5: Commit** `feat(api): attachment upload/download with safe cleanup + orphan logging`.
 
@@ -516,6 +644,20 @@ it('returns 404 when the DB row exists but the file is missing', async () => { /
 - [ ] **Step 1: Write failing e2e** — after a submission + a transition, the citizen's `GET /notifications` returns 2 rows, `unread-count` = 2, mark-read drops it to 1; a different user cannot read or mark these (403/404).
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement**. **Step 4: Run** → PASS. **Step 5: Commit** `feat(api): owner-scoped notifications endpoints`.
 
+### BFF Security Test Matrix (shared by Tasks 18 & 19)
+
+Both BFFs are hardened to the SAME security contract; each task implements this full matrix against its own allowlist. Every row is an executable test in that task's `route.test.ts` (mock `global.fetch`; assert the proxy's behavior):
+
+1. **Allowlisted (method, path) forwards** to `API_INTERNAL_URL` with the request body/query and the inbound `Cookie` header intact.
+2. **Non-allowlisted path → 404** (e.g. `/api/v1/dev/last-otp`, `/api/v1/users/me` on admin) — upstream never called.
+3. **Non-allowlisted method on an allowlisted path → 404** (e.g. `DELETE /api/v1/issues/x` when only GET/PATCH are listed) — upstream never called.
+4. **Path traversal rejected** — `/api/v1/../secret`, `/api/v1/issues/%2e%2e/x`, and encoded variants normalize-then-reject → 404; upstream never called.
+5. **Absolute-URL / host override rejected** — a catch-all segment that decodes to `http://evil.test/...` or `//evil.test` never changes the upstream origin → 404; `fetch` (if called) targets only `API_INTERNAL_URL`.
+6. **`Authorization` header from the client is NOT forwarded** — assert the outbound headers omit it (only `Cookie` + content-type pass).
+7. **`Set-Cookie` relayed** via `getSetCookie()` — multiple cookies survive (reuse the M1 comma-in-Expires fixture).
+8. **Internal origin never leaked** — an upstream failure yields a 502 whose body/headers contain no `API_INTERNAL_URL` substring.
+9. **Cookie forwarded for authed calls** — the inbound `pg_session` cookie reaches upstream unchanged.
+
 ### Task 18: Harden the citizen BFF to an allowlist
 
 **Files:**
@@ -523,10 +665,10 @@ it('returns 404 when the DB row exists but the file is missing', async () => { /
 - Test: `apps/citizen/src/app/api/v1/[...path]/route.test.ts` (extend)
 
 **Interfaces:**
-- Produces: `isAllowed(method, path): boolean` over the citizen allowlist (auth/*, issues, issues/:id, issues/:id/status is NOT citizen — exclude; attachments/:id, issues/:id/attachment, notifications*, categories, panchayats*, users/me); non-allowlisted → 404; fixed `API_INTERNAL_URL` origin; traversal/absolute-URL rejected; no `Authorization` forwarded; `Set-Cookie` relayed.
+- Produces: `isAllowed(method, path): boolean` over the **citizen allowlist** — `POST auth/*`, `GET auth/me`, `POST issues`, `GET issues`, `GET issues/:id`, `POST issues/:id/attachment`, `GET attachments/:id`, `GET|PATCH notifications*`, `GET categories`, `GET panchayats*`, `PATCH users/me`. **Excludes** `issues/:id/status` and `issues/on-behalf` (staff-only — not reachable from the citizen origin). Fixed `API_INTERNAL_URL` origin; traversal/absolute-URL rejected; no `Authorization` forwarded; `Set-Cookie` relayed.
 
-- [ ] **Step 1: Write failing tests** — an allowlisted path forwards; `/api/v1/dev/last-otp` (or any non-allowlisted) → 404; an absolute-URL/`..` path → 404; internal origin never appears in a 502 body.
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** the allowlist (array of `{method, pattern}`; match the decoded, normalized path). **Step 4: Run** → PASS. **Step 5: Commit** `fix(citizen): harden BFF proxy to a path/method allowlist`.
+- [ ] **Step 1: Write failing tests — the full BFF Security Test Matrix (rows 1–9 above) against the citizen allowlist.** Include citizen-specific negatives: `PATCH /api/v1/issues/x/status` → 404 (staff-only, not on the citizen allowlist); `/api/v1/dev/last-otp` → 404.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** the allowlist (array of `{method, pattern}`; match the decoded, normalized path; reject before any `fetch`). **Step 4: Run** → PASS. **Step 5: Commit** `fix(citizen): harden BFF proxy to a path/method allowlist`.
 
 ### Task 19: Admin general BFF (hardened) *(parallels Task 18)*
 
@@ -535,10 +677,10 @@ it('returns 404 when the DB row exists but the file is missing', async () => { /
 - Test: `apps/admin/src/app/api/v1/[...path]/route.test.ts`
 
 **Interfaces:**
-- Produces: admin allowlist (auth/*, issues, issues/:id, issues/:id/status, issues/on-behalf is REP-only but still allowlisted, attachments/:id); same hardening as Task 18. The static `/api/v1/auth/[...action]` route still wins over the catch-all.
+- Produces: the **admin allowlist** — `POST auth/*`, `GET auth/me`, `GET issues`, `GET issues/:id`, `PATCH issues/:id/status`, `POST issues/on-behalf`, `GET attachments/:id`. **Excludes** citizen-only writes (`POST issues`, `POST issues/:id/attachment`, `PATCH users/me`) and everything non-staff. Same hardening helper as Task 18 (copied into `apps/admin/src/lib/bff-proxy.ts`). The static `/api/v1/auth/[...action]` route still wins over the catch-all.
 
-- [ ] **Step 1: Write failing tests** — mirror Task 18 for the admin allowlist; confirm `issues/:id/status` (admin-only) is allowlisted and e.g. `users/me` is NOT; confirm the existing auth route is untouched + its tests still pass.
-- [ ] **Step 2: Run** → FAIL. **Step 3: Implement**. **Step 4: Run** → PASS; run the M1 admin auth route tests. **Step 5: Commit** `feat(admin): hardened general BFF catch-all for issue APIs`.
+- [ ] **Step 1: Write failing tests — the full BFF Security Test Matrix (rows 1–9 above) against the admin allowlist.** Include admin-specific cases: `PATCH /api/v1/issues/x/status` → **forwarded** (allowlisted); `GET /api/v1/users/me` → **404** (not on the admin allowlist); confirm the existing `/api/v1/auth/*` route is untouched and its M1 tests still pass.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement** (reuse the Task 18 helper). **Step 4: Run** → PASS; also run the M1 admin auth route tests. **Step 5: Commit** `feat(admin): hardened general BFF catch-all for issue APIs`.
 
 ### Task 20: api-client — issue + notification methods and hooks
 
