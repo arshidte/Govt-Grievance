@@ -110,9 +110,10 @@ in `@pg/i18n`: `@pg/types` becomes the one source; `@pg/ui` badges and
   `priority Priority @default(MEDIUM)`, `subcategoryId String?` (FK→Subcategory,
   optional), `updatedAt DateTime @updatedAt`.
 - **IssueStatusHistory** replaces the lone `status String` with:
-  `changedById String` (FK→User), `fromStatus IssueStatus`,
-  `toStatus IssueStatus`, `note String?`, `createdAt`. One row per successful
-  transition.
+  `changedById String?` (FK→User, nullable — see §4.5 for why),
+  `fromStatus IssueStatus`, `toStatus IssueStatus`, `note String?`,
+  `createdAt`. One row per successful transition; M2-created rows always carry
+  `changedById`.
 - **Attachment** adds: `uploadedById String` (FK→User), `mimeType String`,
   `sizeBytes Int`, `originalName String`. Keeps `storageKey` (opaque).
 - **Notification** adds: `statusHistoryId String? @unique` (FK→
@@ -137,6 +138,35 @@ in `@pg/i18n`: `@pg/types` becomes the one source; `@pg/ui` badges and
 `IssueAssignment` and `Escalation` are **not modified** in M2 (assignment and
 escalation are later milestones). The M1-audit-noted missing `assignee` FK on
 `IssueAssignment` is explicitly left for M3 when assignment is built.
+
+### 4.5 Migration safety for IssueStatusHistory (revision #2)
+Replacing the lone `status String` with `fromStatus`/`toStatus`/`changedById`
+must not lose or corrupt any pre-existing rows. Facts and strategy:
+
+- **Real-world state:** in a true M1 database `IssueStatusHistory` is **empty** —
+  M1 shipped no issue-creation path (issue endpoints are M2), so nothing ever
+  wrote a row. The migration must nonetheless be safe for any populated table.
+- **Expand → backfill → contract** (single migration, ordered steps):
+  1. *Expand (additive, nullable):* add `fromStatus`, `toStatus` (nullable),
+     `changedById` (nullable FK), `note`.
+  2. *Backfill:* for each existing row set `toStatus := status` and
+     `fromStatus := status` (the historical "from" is unrecorded; using the
+     row's own recorded status for both is the lossless, non-inventing choice),
+     leave `changedById := NULL` (the legacy actor is genuinely unknown — we do
+     **not** fabricate an actor or point at an arbitrary user), `note := NULL`.
+  3. *Tighten:* set `fromStatus`/`toStatus` `NOT NULL` after backfill; **drop
+     the old `status` column**.
+- **`changedById` stays nullable** precisely so legacy/backfilled rows need no
+  invented actor; M2 application logic always populates it for new rows, so the
+  null-actor case exists only for pre-M2 history. (If a deployment knows its
+  table is empty, the backfill is a no-op and the outcome is identical.)
+- **Migration test (required):** a test that starts a database at the M1
+  migration state, inserts a legacy-shaped `IssueStatusHistory` row
+  (`status='SUBMITTED'`, with the minimal FK graph — an Issue in its M1 shape +
+  its required User/Panchayat/Ward/Category rows), applies the M2 migration, and
+  asserts the row survived with `toStatus='SUBMITTED'`, `fromStatus='SUBMITTED'`,
+  `changedById IS NULL`, the old `status` column gone, and **zero rows lost**.
+  This runs in addition to the clean-DB migration + seed-idempotency checks.
 
 ---
 
@@ -209,6 +239,51 @@ DTOs and request zod schemas live in `@pg/types`; `@pg/api-client` exposes
 typed methods + TanStack Query hooks for each. Server ignores any
 client-supplied protected field (`status`, `priority`, `citizenId`,
 `createdById`, `onBehalfOf`, `referenceNo`).
+
+### 6.1 Request validation (server-authoritative; revision #3)
+Every create path validates, server-side, before any write:
+- **Forced fields:** `status := SUBMITTED`, `priority := MEDIUM`,
+  `citizenId`/`createdById` derived from session (self-submit) or from the rep +
+  resolved citizen (on-behalf); client values for protected fields are ignored,
+  never trusted.
+- **Ward ∈ panchayat:** the selected `wardId` must belong to the selected
+  `panchayatId` (for self-submit) or to the rep's scope (on-behalf); else `422`
+  (`ward_panchayat_mismatch`).
+- **Subcategory ∈ category:** when `subcategoryId` is supplied, it must belong
+  to the selected `categoryId` (the `Subcategory.categoryId` FK must match);
+  else `422` (`subcategory_category_mismatch`). `categoryId` itself must
+  reference an existing seeded category.
+These checks are independent and all enforced on the server regardless of any
+client-side form validation.
+
+### 6.2 Creation idempotency (revision #4)
+Applies to `POST /issues` and `POST /issues/on-behalf` via an optional
+`Idempotency-Key` request header. A retry must never create a duplicate issue
+or duplicate notification.
+- **Scope:** a key is namespaced by **(authenticated user id + route)**. The
+  same key presented by a different user, or on a different route, is a distinct
+  key. (For on-behalf the acting rep is the user; two reps using the same
+  opaque key string do not collide.)
+- **Persistence:** a dedicated `IdempotencyKey` table stores `key`, `userId`,
+  `route`, a **request-payload fingerprint** (hash of the normalized body), the
+  **resulting `issueId` + stored response**, and `createdAt`. The record is
+  written in the **same transaction** as the issue (+ submission notification),
+  so a key is persisted only if its issue was.
+- **Client retry behavior:** a repeat request with the **same key + same
+  payload fingerprint** returns the **original stored response** (same issue,
+  same reference number) without creating anything new.
+- **Same key / different payload:** a repeat with the **same key but a
+  different fingerprint** is rejected with `409`
+  (`idempotency_key_conflict`) — it neither creates a new issue nor returns the
+  prior result (prevents a key from masking a changed request).
+- **Expiry / retention:** keys are retained **24 hours**, then purged by a
+  scheduled cleanup; after expiry the same key string is treated as new. (The
+  purge mechanism — a periodic job vs. lazy delete-on-read-past-TTL — is an
+  implementation choice for the plan; the 24h TTL is fixed here.)
+- **Absence of a key:** without the header, no dedup is attempted; the unique
+  `(issueId, 'issue.submitted')` notification index remains the backstop against
+  a duplicate submission notification, but a keyless retry **can** create a
+  second issue — clients are expected to send the header for safe retries.
 
 ---
 
@@ -293,7 +368,24 @@ first-class part of the spec and is covered by BFF tests (§13).
   `createdById` = rep; `onBehalfOf = true`. The **citizen** is the notification
   recipient and the tracking owner. The rep gains **no** general access to the
   citizen's profile or unrelated issues — the rep sees this issue only through
-  normal ward-scoped issue reads, nothing citizen-specific beyond it.
+  normal ward-scoped issue reads, nothing citizen-specific beyond it. There is
+  **no citizen-lookup/search endpoint**: the only input is the phone on this
+  create call, and the response never echoes citizen data — so the endpoint
+  cannot be used to enumerate or probe citizen records.
+- **Abuse prevention — rate limiting (clarification #1).** On-behalf creation
+  is rate-limited **per representative** (a sensible fixed cap per hour, env-
+  configurable like M1's OTP limits) and remains under the existing per-IP
+  throttle; breaching returns `429` (`rate_limited`, the M1 contract). This
+  bounds both accidental retries and deliberate mass-creation / phone-probing
+  attempts. The limit is server-enforced and fails closed.
+- **Abuse prevention — audit logging (clarification #1).** Every on-behalf
+  creation writes an `AuditService` event (reusing M1 audit) recording: acting
+  rep's user id, the resolved issue id + reference number, the target ward, and
+  the citizen phone **in masked form only** (e.g. last-4, per the M1 audit
+  masking rule) — **never** the plaintext phone, and **never** any citizen
+  profile field. A failed/denied on-behalf attempt (out-of-scope ward, rate-
+  limited) is also audited. This gives an accountability trail for
+  representative-created issues without leaking citizen data.
 - **Atomicity / idempotency / partial failure.** Citizen resolution + issue
   creation + the `issue.submitted` notification occur in **one Prisma
   `$transaction`**: if issue creation or the notification fails, the whole unit
@@ -334,12 +426,22 @@ One optional image per issue, owner-uploaded.
   authenticated streaming route.
 - **Authorization.** Upload: issue owner only. Download (`GET /attachments/:id`):
   issue owner or in-scope staff; authorized before any byte is read.
-- **Orphan / partial-failure handling.** Creation order: **write the DB
-  `Attachment` row and the file within a bounded operation; if the DB write
-  fails after the file was written, the file is deleted (compensating cleanup);
-  if the file write fails, no DB row is created.** Net invariant: no DB row
-  without its file, and no stored file without a DB row. A background concern
-  (periodic orphan sweep) is noted as future work, not M2.
+- **Orphan / partial-failure handling (revision #5).** Creation order:
+  write the file first, then the DB `Attachment` row; if the DB write fails
+  after the file was written, attempt a **compensating delete** of the file; if
+  the file write fails, no DB row is created.
+  - **Intended invariant:** no DB row without its file; no stored file without a
+    DB row.
+  - **If the compensating delete itself fails** (disk error, permissions), an
+    **orphan file can exist** — this is **not claimed to be impossible**. It is:
+    (a) **logged at ERROR** with the `storageKey`, the owning issue id, and the
+    originating failure, so it is discoverable; (b) **harmless to security/
+    correctness** — with no DB row it is never served (download requires a row),
+    never counted, and occupies only dev-disk space; (c) **reconcilable** by a
+    future periodic orphan-sweep (explicitly out of M2 scope). The API still
+    returns the original DB-failure error to the client; the cleanup failure
+    does not change the client response.
+  - The reverse orphan (DB row, missing file) is handled at read time below.
 - **Missing-file behavior.** If a DB row exists but the file is absent at
   download time (e.g. ephemeral dev disk wiped), the API returns a clean
   `404 attachment_unavailable` (logged server-side) rather than a 500 or a
@@ -406,10 +508,19 @@ One optional image per issue, owner-uploaded.
 - **Submission:** forced `status=SUBMITTED`, `priority=MEDIUM`,
   `citizenId=createdById=session`, `onBehalfOf=false`; client-supplied
   `priority`/`status`/`citizenId`/`onBehalfOf`/`referenceNo` ignored;
-  ward-must-belong-to-panchayat rejected; idempotency-key retry creates one
-  issue.
+  **ward-must-belong-to-panchayat** rejected (422); **subcategory-must-belong-
+  to-category** rejected (422) and unknown category rejected.
+- **Creation idempotency:** same key + same payload → one issue, original
+  response returned on retry (no duplicate issue or notification); **same key +
+  different payload → 409** `idempotency_key_conflict` (no create, no stale
+  result); keyless retry may create a second issue (documented); expired key
+  (past 24h) treated as new.
 - **Reference numbers:** uniqueness; **concurrent creation** (N parallel
   submissions yield N distinct reference numbers, no collision).
+- **Migration safety:** against a **populated pre-M2 database** — a legacy
+  `IssueStatusHistory` row (`status='SUBMITTED'`) survives the M2 migration as
+  `fromStatus='SUBMITTED'`, `toStatus='SUBMITTED'`, `changedById IS NULL`, old
+  `status` column dropped, zero rows lost (§4.5).
 - **Transition (concurrency):** conditional-update gate — two racing valid
   transitions yield exactly one success (one history, one notification) and one
   `409`; invalid/backward/skip/CLOSED/REOPENED → `422`; retry of applied
@@ -421,11 +532,16 @@ One optional image per issue, owner-uploaded.
   (no profile, no account-existence signal — identical for new vs existing
   phone); rep cannot read the citizen's profile or unrelated issues; partial
   failure rolls back (no orphan citizen/issue); concurrent same-phone resolution
-  creates one citizen.
+  creates one citizen; **per-rep rate limit → 429 past the cap**; **audit event
+  written on success and on denied/limited attempts, with the phone masked and
+  no citizen profile fields**.
 - **Attachments:** happy-path upload + authorized download; invalid type (by
   content sniffing) → 415; oversize → 413; second upload → 409; unauthorized
-  upload/download → 403; path-traversal attempt neutralized; DB-failure
-  compensation deletes the file; missing-file download → clean 404.
+  upload/download → 403; path-traversal attempt neutralized; DB-failure triggers
+  the compensating delete; **when the compensating delete also fails, an ERROR
+  log with the storageKey is emitted and the client still gets the original
+  error** (orphan acknowledged, not claimed impossible); missing-file download →
+  clean 404.
 - **Admin BFF:** only allowlisted `(method, path)` forwarded; non-allowlisted →
   404; traversal/absolute-URL/host-override rejected; `Set-Cookie` relayed;
   internal origin never leaked; `Authorization` header not forwarded.
@@ -456,14 +572,24 @@ One optional image per issue, owner-uploaded.
    resolve to one winner).
 4. On-behalf API works, is ward-scoped, non-disclosing, and transactionally safe;
    the citizen owns and is notified.
-5. Attachments are size/type-validated, authorized, traversal-safe, and leave no
-   orphans; missing files degrade cleanly.
-6. Priority is immutable from any client (always MEDIUM in M2).
+5. Attachments are size/type-validated (content-sniffed), authorized, and
+   traversal-safe; the happy path leaves no orphan, and a cleanup failure is
+   logged (ERROR + storageKey) rather than hidden — orphans are never served
+   and missing files degrade to a clean 404.
+6. Priority is immutable from any client (always MEDIUM in M2); `categoryId`,
+   `subcategoryId∈category`, and `ward∈panchayat` are validated server-side.
 7. Admin BFF forwards only allowlisted paths/methods to the fixed internal
    origin with no leakage.
-8. en/ml parity holds; `pnpm turbo run lint typecheck test build` is green; both
-   Playwright suites pass against the real Postgres-backed API; clean-DB
-   migration + seed idempotency re-verified after the schema change.
+8. On-behalf creation is per-rep rate-limited and audited (phone masked, no
+   citizen profile leaked); a non-disclosing find-or-create cannot be used to
+   probe citizen records.
+9. Creation idempotency holds: same key+payload is a no-op returning the
+   original result; same key+different payload is a 409; a retry never
+   duplicates an issue or a submission notification.
+10. The IssueStatusHistory migration is proven safe against a populated pre-M2
+    database (no row loss), in addition to clean-DB migration + seed idempotency.
+11. en/ml parity holds; `pnpm turbo run lint typecheck test build` is green; both
+    Playwright suites pass against the real Postgres-backed API.
 
 ---
 
@@ -486,18 +612,24 @@ background orphan-sweep. Each is a later milestone, not a silent omission.
    and has never logged in; their first self-login (OTP) must reconcile to the
    same phone-keyed identity (it will, via the unique `phone`). First-login UX
    for such pre-created citizens is otherwise unchanged; flagged for awareness.
-3. **Local-disk attachments in multi-instance/CI.** Dev-only local disk is not
-   shared across instances; CI runs a single API instance so Playwright
-   attachment tests are fine, but this must not be read as production-ready
-   storage. Documented in §10.
+3. **Local-disk attachments + possible orphans.** Dev-only local disk is not
+   shared across instances (CI runs a single API instance, so Playwright
+   attachment tests are fine) and is **not production storage**. Per §10, an
+   orphan file **can** occur if a compensating delete fails; it is logged,
+   never served, and reconcilable by a future orphan-sweep — explicitly **not**
+   claimed impossible.
 4. **Reference-number year label vs. non-resetting sequence.** `YYYY` is a
    display label only; the number does not reset per year, so two issues in
    different years can read `GRV-2026-000500` / `GRV-2027-000501`. Confirmed
    acceptable per decision #3; noted so it is not mistaken for a defect.
-5. **Idempotency-Key scope.** Proposed for `POST /issues` and
-   `POST /issues/on-behalf` to dedupe creation on retry; the exact key storage
-   (short-lived table vs. header-echo) is an implementation detail for the plan,
-   not a spec-level decision — flagged so the plan resolves it.
+5. **Idempotency-Key purge mechanism.** The key semantics (scope, persistence,
+   24h TTL, same-key/different-payload → 409) are **specified in §6.2**; the only
+   detail left to the plan is the *purge mechanism* (scheduled job vs.
+   lazy delete-past-TTL) — a non-behavioral implementation choice.
+6. **On-behalf rate-limit tuning.** The per-rep cap value is env-configurable
+   (like M1's OTP limits); the exact default is a tuning decision for the plan,
+   not a correctness concern — the mechanism and its fail-closed behavior are
+   specified (§9).
 
 ---
 
