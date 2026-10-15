@@ -1,3 +1,12 @@
+'use client';
+
+// Button attaches an onClick handler (click-guarding for disabled/loading),
+// so it must be a Client Component. Without this directive, using it from a
+// Server Component (e.g. the citizen landing page's `<Button asChild>` CTAs)
+// fails with "Event handlers cannot be passed to Client Component props" once
+// the handler is merged onto the slotted child. The directive makes Button a
+// client boundary; server components can still render it and pass a <Link>
+// child, and the page itself stays a Server Component (SEO intact).
 import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 import { cn } from '../lib/cn';

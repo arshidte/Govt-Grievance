@@ -37,7 +37,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Single worker everywhere (not just CI): these auth specs share ONE
+  // backend, ONE seeded staff identity, and an in-memory mock SMS provider
+  // keyed by phone (last-code-per-phone). Parallel workers logging in the
+  // same seeded phone would race on that shared OTP state. Serial execution
+  // makes the suite deterministic and matches how CI already runs it.
+  workers: 1,
   reporter: 'list',
   timeout: 30_000,
   expect: { timeout: 5_000 },
@@ -52,10 +57,21 @@ export default defineConfig({
   webServer: [
     {
       command:
+        // Load the repo-root .env (gitignored) for the prisma CLI steps when
+        // present (local dev); in CI it is absent and DATABASE_URL et al come
+        // from the job environment, so the sourcing is skipped. `@pg/api...`
+        // builds @pg/types (its workspace dep) BEFORE @pg/api so the built
+        // `dist/main.js` can resolve it at runtime even on a clean checkout.
+        'if [ -f .env ]; then set -a; . ./.env; set +a; fi && ' +
         'pnpm --filter @pg/api exec prisma migrate deploy && ' +
         'pnpm --filter @pg/api exec prisma db seed && ' +
-        'pnpm --filter @pg/api build && ' +
-        'node apps/api/dist/main.js',
+        'pnpm --filter "@pg/api..." build && ' +
+        // Raise the per-phone OTP limit for the e2e API only: this suite logs
+        // in the SAME seeded COORDINATOR phone several times per run, which
+        // would otherwise trip the default 5/hour limit (incidental coupling,
+        // not the behavior under test here — the limit itself is asserted by
+        // the api suite's otp.service.spec + throttle.e2e-spec).
+        'OTP_RATE_LIMIT_PER_PHONE_PER_HOUR=100 node apps/api/dist/main.js',
       cwd: '../..',
       url: `http://localhost:${API_PORT}/api/v1/health`,
       reuseExistingServer: !process.env.CI,
@@ -64,7 +80,13 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'pnpm --filter @pg/admin build && pnpm --filter @pg/admin start',
+      command:
+        // Source the repo-root .env locally so the app's server runtime gets
+        // API_INTERNAL_URL (used by the BFF/RSC) and SESSION_COOKIE_NAME
+        // (inlined into middleware at build); skipped in CI where these come
+        // from the job environment.
+        'if [ -f .env ]; then set -a; . ./.env; set +a; fi && ' +
+        'pnpm --filter @pg/admin build && pnpm --filter @pg/admin start',
       cwd: '../..',
       url: `http://localhost:${APP_PORT}`,
       reuseExistingServer: !process.env.CI,

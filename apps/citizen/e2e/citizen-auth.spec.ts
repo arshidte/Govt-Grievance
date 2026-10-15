@@ -55,6 +55,14 @@ test.describe('citizen auth', () => {
       await page.getByLabel(`Digit ${i + 1} of 6`).fill(code[i] as string);
     }
 
+    // A brand-new phone verifies into a citizen account with no `fullName`
+    // yet, so verify/page.tsx routes it to `/register` (profile completion)
+    // BEFORE `/home` — see verify/page.tsx and register/page.tsx. Complete
+    // the profile; on save, RegisterForm navigates to `/home`.
+    await expect(page).toHaveURL(/\/register$/);
+    await page.getByLabel(/Full name/).fill('Test Citizen');
+    await page.getByRole('button', { name: 'Save and continue' }).click();
+
     await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByTestId('home-page')).toBeVisible();
 

@@ -48,6 +48,14 @@ function devPhone(): string {
  */
 const SEEDED_COORDINATOR_PHONE = '+919000000002';
 
+/**
+ * API origin (the Playwright webServer boots it on :4000). The dev-only OTP
+ * endpoint lives on the API itself; unlike the citizen app, the admin app has
+ * NO general BFF catch-all (only `/api/v1/auth/*`), so `/api/v1/dev/last-otp`
+ * must be read from the API origin directly, not the admin same-origin.
+ */
+const API_BASE = 'http://localhost:4000';
+
 test.describe('admin staff gate', () => {
   test('an unauthenticated visit to the admin dashboard redirects to /login', async ({ page }) => {
     await page.goto('/');
@@ -57,50 +65,53 @@ test.describe('admin staff gate', () => {
 
   test('a citizen session (no staff role) visiting / sees the Forbidden state, not a crash or blank page', async ({
     page,
-    baseURL,
-    request,
   }) => {
-    // Obtain a real citizen session cookie via the OTP dev flow against
-    // the SAME backend the citizen app uses (both apps share pg_session —
-    // see src/lib/api.ts). This mirrors apps/citizen/e2e/citizen-auth.spec.ts's
-    // dev-OTP technique rather than driving the citizen app's UI.
+    // Drive the admin app's OWN login/verify UI with a brand-new phone, so
+    // the `pg_session` cookie is set FIRST-PARTY on the admin origin (via the
+    // admin BFF) in the SAME browser context the subsequent `page.goto('/')`
+    // uses. (Setting a cookie via Playwright's bare `request` fixture would
+    // land it in a separate cookie jar the page never sees.) A brand-new
+    // phone self-registers as a CITIZEN (no staff role) — exactly the case
+    // the server-side `requireStaff` gate must deny with ForbiddenState.
     const phone = devPhone();
-    const apiBase = baseURL!.replace(':3001', ':4000');
 
-    await request.post(`${apiBase}/api/v1/auth/request-otp`, {
-      data: { phone },
-    });
+    await page.goto('/login');
+    await page.getByTestId('login-phone-input').fill(phone);
+    await page.getByTestId('login-submit').click();
+    await expect(page).toHaveURL(/\/verify\?phone=/);
 
-    const lastOtpResponse = await request.get(
-      `${apiBase}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
+    const lastOtpResponse = await page.request.get(
+      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
     );
     expect(lastOtpResponse.ok()).toBe(true);
     const { code } = (await lastOtpResponse.json()) as { code: string };
+    expect(code).toMatch(/^\d{6}$/);
 
-    const verifyResponse = await request.post(`${apiBase}/api/v1/auth/verify-otp`, {
-      data: { phone, code },
-    });
-    expect(verifyResponse.ok()).toBe(true);
+    for (let i = 0; i < code.length; i += 1) {
+      await page.getByLabel(`Digit ${i + 1} of 6`).fill(code[i] as string);
+    }
 
-    // A brand-new phone verifies into a CITIZEN-only account (no staff
-    // role assignments) — exactly the case `requireStaff` must deny.
-    await page.goto('/');
+    // Post-verify, the citizen lands on `/`, where the (app) layout's
+    // requireStaff gate renders the Forbidden state (not a crash/blank).
     await expect(page.getByTestId('admin-forbidden-state')).toBeVisible();
-    await expect(page.getByRole('alert')).toBeVisible();
+    // ...and it is itself the accessible alert (role="alert"), so AT announces
+    // the denial. Scope to this element: Next injects its own empty
+    // role="alert" route-announcer, so a page-wide getByRole('alert') is
+    // ambiguous.
+    await expect(page.getByTestId('admin-forbidden-state')).toHaveAttribute('role', 'alert');
   });
 
   test('a seeded COORDINATOR logs in via the admin login/verify UI and lands on the dashboard', async ({
     page,
-    baseURL,
   }) => {
     // Unlike the citizen-session case above (which obtains its cookie via
     // direct API calls), this drives the admin app's OWN `/login` ->
     // `/verify` UI end to end, through the BFF proxy, exercising:
     //  - the BFF relay setting `pg_session` as a first-party cookie
     //    (src/app/api/v1/auth/[...action]/route.ts)
-    //  - the dev-only `GET /api/v1/dev/last-otp` endpoint, called through
-    //    the SAME BFF mount (not the raw API origin) to prove the GET leg
-    //    of the proxy also works for this app
+    //  - the dev-only `GET /api/v1/dev/last-otp` endpoint, read directly
+    //    from the API origin (the admin app has no general BFF catch-all —
+    //    only /api/v1/auth/* — so this cannot go through the admin origin)
     //  - VerifyForm's post-verify navigation to `/`
     //  - the `(app)` layout's `requireStaff` gate's ALLOW path for a real
     //    staff role (COORDINATOR)
@@ -112,7 +123,7 @@ test.describe('admin staff gate', () => {
     await expect(page).toHaveURL(/\/verify\?phone=/);
 
     const lastOtpResponse = await page.request.get(
-      `${baseURL}/api/v1/auth/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
+      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
     );
     expect(lastOtpResponse.ok()).toBe(true);
     const { code } = (await lastOtpResponse.json()) as { code: string };
@@ -126,20 +137,20 @@ test.describe('admin staff gate', () => {
     // No /register branch in admin (staff are seeded, never self-registered)
     // — verify always routes straight to `/`, and the dashboard renders
     // because `requireStaff` allows the COORDINATOR role.
-    await expect(page).toHaveURL(new RegExp(`${baseURL}/en/?$`));
+    await expect(page).toHaveURL(/\/en\/?$/);
     await expect(page.getByTestId('admin-dashboard-page')).toBeVisible();
   });
 });
 
 /** Drives the same login/verify flow as the test above, landing an authenticated COORDINATOR session on `/`. Shared by the T27 nav-shell specs below so each test doesn't repeat the OTP dance. */
-async function loginAsSeededCoordinator(page: import('@playwright/test').Page, baseURL: string) {
+async function loginAsSeededCoordinator(page: import('@playwright/test').Page) {
   await page.goto('/login');
   await page.getByTestId('login-phone-input').fill(SEEDED_COORDINATOR_PHONE);
   await page.getByTestId('login-submit').click();
   await expect(page).toHaveURL(/\/verify\?phone=/);
 
   const lastOtpResponse = await page.request.get(
-    `${baseURL}/api/v1/auth/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
+    `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
   );
   const { code } = (await lastOtpResponse.json()) as { code: string };
   for (let i = 0; i < code.length; i += 1) {
@@ -151,8 +162,8 @@ async function loginAsSeededCoordinator(page: import('@playwright/test').Page, b
 test.describe('admin responsive nav shell (T27)', () => {
   test.use({ viewport: { width: 375, height: 812 } }); // <lg: drawer, not persistent sidebar
 
-  test('at <lg width, the sidebar is replaced by a toggleable drawer', async ({ page, baseURL }) => {
-    await loginAsSeededCoordinator(page, baseURL!);
+  test('at <lg width, the sidebar is replaced by a toggleable drawer', async ({ page }) => {
+    await loginAsSeededCoordinator(page);
 
     // Persistent sidebar is `hidden lg:flex` — not visible below `lg`.
     await expect(page.getByTestId('admin-sidebar')).toBeHidden();
@@ -179,12 +190,16 @@ test.describe('admin responsive nav shell (T27)', () => {
 
   test('clicking a nav item in the drawer routes and highlights it, then closes the drawer', async ({
     page,
-    baseURL,
   }) => {
-    await loginAsSeededCoordinator(page, baseURL!);
+    await loginAsSeededCoordinator(page);
 
     await page.getByTestId('mobile-drawer-trigger').click();
-    await page.getByTestId('nav-link-issues').click();
+    // Scope nav-link lookups to the drawer: the persistent sidebar is
+    // `hidden lg:flex` (present in the DOM but hidden at this viewport), so an
+    // unscoped getByTestId('nav-link-issues') matches BOTH the sidebar and the
+    // drawer copies and trips Playwright strict mode.
+    const drawer = page.getByTestId('mobile-drawer');
+    await drawer.getByTestId('nav-link-issues').click();
 
     await expect(page).toHaveURL(/\/issues$/);
     await expect(page.getByTestId('admin-issues-page')).toBeVisible();
@@ -193,16 +208,17 @@ test.describe('admin responsive nav shell (T27)', () => {
 
     // Re-open and confirm the active item carries aria-current="page".
     await page.getByTestId('mobile-drawer-trigger').click();
-    await expect(page.getByTestId('nav-link-issues')).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page.getByTestId('mobile-drawer').getByTestId('nav-link-issues'),
+    ).toHaveAttribute('aria-current', 'page');
   });
 });
 
 test.describe('admin responsive nav shell — desktop (T27)', () => {
   test('at >=lg width, the sidebar is persistent and clicking a nav item highlights the active route', async ({
     page,
-    baseURL,
   }) => {
-    await loginAsSeededCoordinator(page, baseURL!);
+    await loginAsSeededCoordinator(page);
 
     await expect(page.getByTestId('admin-sidebar')).toBeVisible();
     await expect(page.getByTestId('mobile-drawer-trigger')).toBeHidden();
