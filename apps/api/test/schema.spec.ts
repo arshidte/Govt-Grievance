@@ -70,6 +70,8 @@ describe('schema relationships', () => {
     const issue = await db.issue.create({
       data: {
         referenceNo: `REF-${suffix}`,
+        title: 'Pothole on main road',
+        description: 'A large pothole is causing traffic issues.',
         citizenId: citizen.id,
         createdById: staff.id,
         onBehalfOf: true,
