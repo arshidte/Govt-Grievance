@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { CreateIssueInput, IssueDetailDTO } from '@pg/types';
+import type { CreateIssueInput, IssueDetailDTO, IssueSummaryDTO } from '@pg/types';
 import type { Prisma } from '@prisma/client';
 
+import { AccessControlService } from '../access/access-control.service';
 import type { SessionUser } from '../auth/session.service';
 import { ApiError } from '../common/api-error';
 import { fingerprintOf, IdempotencyService } from '../common/idempotency/idempotency.service';
@@ -19,6 +20,26 @@ const CREATE_ISSUE_ROUTE = 'POST /issues';
  * and the mapper agree on shape without a second round-trip query.
  */
 type IssueRow = Awaited<ReturnType<Prisma.IssueDelegate['create']>>;
+
+function toIssueSummaryDTO(issue: {
+  id: string;
+  referenceNo: string;
+  title: string;
+  status: IssueRow['status'];
+  priority: IssueRow['priority'];
+  categoryId: string;
+  createdAt: Date;
+}): IssueSummaryDTO {
+  return {
+    id: issue.id,
+    referenceNo: issue.referenceNo,
+    title: issue.title,
+    status: issue.status,
+    priority: issue.priority,
+    categoryId: issue.categoryId,
+    createdAt: issue.createdAt.toISOString(),
+  };
+}
 
 function toIssueDetailDTO(issue: IssueRow): IssueDetailDTO {
   return {
@@ -76,6 +97,7 @@ export class IssuesService {
     private readonly issueReference: IssueReferenceService,
     private readonly idempotency: IdempotencyService,
     private readonly notifications: NotificationsService,
+    private readonly accessControl: AccessControlService,
   ) {}
 
   async createForCitizen(
@@ -127,6 +149,102 @@ export class IssuesService {
     );
 
     return result;
+  }
+
+  /**
+   * Scoped issue list (M2 spec §6): a CITIZEN sees only their own
+   * submissions; STAFF see every issue within their role's scope
+   * (ADMIN → all; COORDINATOR → their panchayat(s); REPRESENTATIVE →
+   * their ward(s)). The scope is turned into a Prisma `where` clause and
+   * applied AT THE DATABASE, never as a post-fetch filter, so a staff
+   * member with many assignments still gets one query.
+   */
+  async listFor(user: SessionUser): Promise<IssueSummaryDTO[]> {
+    const where = this.scopeWhereFor(user);
+    if (!where) {
+      return [];
+    }
+
+    const issues = await this.prisma.issue.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return issues.map(toIssueSummaryDTO);
+  }
+
+  /**
+   * Scoped single-issue read (M2 spec §6): returns the full
+   * `IssueDetailDTO` if `user` is the issue's own citizen OR in-scope
+   * staff; otherwise throws a 404 `issue_not_found` — deliberately the
+   * SAME error as a genuinely nonexistent id, so an out-of-scope caller
+   * (citizen or staff) can never distinguish "doesn't exist" from "exists
+   * but isn't yours to see" (see class/module doc on non-disclosure).
+   */
+  async getForUser(user: SessionUser, id: string): Promise<IssueDetailDTO> {
+    const where = this.scopeWhereFor(user);
+    if (!where) {
+      throw new ApiError('issue_not_found', 404, 'errors.issueNotFound');
+    }
+
+    const issue = await this.prisma.issue.findFirst({ where: { ...where, id } });
+
+    if (!issue) {
+      throw new ApiError('issue_not_found', 404, 'errors.issueNotFound');
+    }
+
+    return toIssueDetailDTO(issue);
+  }
+
+  /**
+   * Resolves `user`'s visibility scope into a Prisma `Issue` `where`
+   * clause, or `null` if `user` has no visibility at all (a citizen is
+   * never "null" — they always see their own issues; `null` can only
+   * happen for a staff role with no scoped assignments, which should not
+   * occur given `RoleAssignment`'s DB-level CHECK constraint, but is
+   * handled defensively rather than assumed impossible).
+   *
+   * - ADMIN: no filter (all issues).
+   * - COORDINATOR: `panchayatId IN (their panchayat assignments)`.
+   * - REPRESENTATIVE: `wardId IN (their ward assignments)`.
+   * - CITIZEN / no role assignments: `citizenId = user.id`.
+   *
+   * Uses `AccessControlService.hasRole`/`isStaff` rather than re-deriving
+   * role logic here — this method's only job is turning an already-known
+   * role/scope into a DB filter.
+   */
+  private scopeWhereFor(user: SessionUser): Prisma.IssueWhereInput | null {
+    if (this.accessControl.hasRole(user, 'ADMIN')) {
+      return {};
+    }
+
+    if (this.accessControl.hasRole(user, 'COORDINATOR')) {
+      const panchayatIds = user.roleAssignments
+        .filter((ra) => ra.role === 'COORDINATOR' && ra.panchayatId)
+        .map((ra) => ra.panchayatId as string);
+
+      if (panchayatIds.length === 0) {
+        return null;
+      }
+
+      return { panchayatId: { in: panchayatIds } };
+    }
+
+    if (this.accessControl.hasRole(user, 'REPRESENTATIVE')) {
+      const wardIds = user.roleAssignments
+        .filter((ra) => ra.role === 'REPRESENTATIVE' && ra.wardId)
+        .map((ra) => ra.wardId as string);
+
+      if (wardIds.length === 0) {
+        return null;
+      }
+
+      return { wardId: { in: wardIds } };
+    }
+
+    // Citizen path (no staff role assignment, including a brand-new user
+    // with none at all): visible scope is exactly their own submissions.
+    return { citizenId: user.id };
   }
 
   /**

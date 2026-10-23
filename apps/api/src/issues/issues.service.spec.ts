@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // before PrismaService is constructed, matching the pattern used by other
 // DB-backed specs (see auth/otp.service.spec.ts, issues/issue-reference.service.spec.ts).
 import '../config/env';
+import { AccessControlService } from '../access/access-control.service';
 import type { SessionUser } from '../auth/session.service';
 import { ApiError } from '../common/api-error';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
@@ -28,7 +29,8 @@ describe('IssuesService', () => {
   const idempotency = new IdempotencyService(prisma);
   const notifications = new NotificationsService();
   const issueReference = new IssueReferenceService(prisma);
-  const service = new IssuesService(prisma, issueReference, idempotency, notifications);
+  const accessControl = new AccessControlService();
+  const service = new IssuesService(prisma, issueReference, idempotency, notifications, accessControl);
 
   // Shared seed fixtures, created once for the whole suite.
   let citizen: SessionUser;
