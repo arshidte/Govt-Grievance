@@ -38,6 +38,10 @@ const envSchema = z.object({
   OTP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: z.coerce.number().int().positive().default(5),
+  // Max on-behalf issues one representative may file per rolling hour (M2
+  // Task 12 / spec §9). Fail-safe default of 20; enforced per-rep with a
+  // DB-backed counter that FAILS CLOSED if the count query errors.
+  ON_BEHALF_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
   SMS_PROVIDER: z.string().min(1).default('mock'),
 }).superRefine((e, ctx) => {
   // Fail closed: the in-memory mock SMS provider must never run in

@@ -5,25 +5,16 @@ import type { Request, Response } from 'express';
 
 import { AuditService } from '../audit/audit.service';
 import { ApiError } from '../common/api-error';
+import { maskPhone } from '../common/mask-phone';
 import { AUTH_THROTTLE_LIMIT, AUTH_THROTTLE_TTL_MS } from '../common/throttler.config';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
+
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { buildClearSessionCookie, buildSessionCookie, SESSION_COOKIE_NAME } from './cookie.util';
 import { CurrentUser } from './current-user.decorator';
 import { OtpService } from './otp.service';
 import { SessionService, type SessionUser } from './session.service';
-
-/**
- * Masks `phone` to its last 4 digits for audit metadata (e.g.
- * `+919876543210` -> `*********3210`). GLOBAL CONSTRAINT: audit metadata
- * must never contain a plaintext phone number or OTP code — this is the
- * only form of `phone` that may be recorded.
- */
-function maskPhone(phone: string): string {
-  const visible = phone.slice(-4);
-  return '*'.repeat(Math.max(phone.length - visible.length, 0)) + visible;
-}
 
 /**
  * Overrides the globally-registered `default` throttler (see
