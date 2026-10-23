@@ -43,6 +43,13 @@ const envSchema = z.object({
   // DB-backed counter that FAILS CLOSED if the count query errors.
   ON_BEHALF_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
   SMS_PROVIDER: z.string().min(1).default('mock'),
+  // Filesystem root for the local-disk attachment storage provider (M2
+  // Task 14 / spec §10, ruling R-ENV). MUST resolve OUTSIDE any app's
+  // public/static web root — it is served only via the authenticated
+  // download endpoint (Task 16), never directly by a static file server.
+  // Relative paths are resolved against `process.cwd()` by the provider.
+  // Local-disk storage is DEVELOPMENT-ONLY; see `local-disk.storage.ts`.
+  ATTACHMENT_STORAGE_DIR: z.string().min(1).default('.data/attachments'),
 }).superRefine((e, ctx) => {
   // Fail closed: the in-memory mock SMS provider must never run in
   // production. SMS_PROVIDER defaults to 'mock', so an unset value in a

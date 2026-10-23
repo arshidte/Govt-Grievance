@@ -11,3 +11,6 @@ dist/
 playwright-report/
 test-results/
 blob-report/
+
+# Local-disk attachment storage root (dev-only; never commit uploaded files)
+.data/
