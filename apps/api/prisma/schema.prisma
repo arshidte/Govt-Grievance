@@ -256,6 +256,24 @@ model Notification {
   createdAt       DateTime            @default(now())
 }
 
+// Creation-idempotency replay store (M2 Task 6). Standalone/no relations by
+// design: a userId that no longer resolves to a User must not block replay
+// lookups, and this table's lifecycle (24h TTL purge, Task 9) is intentionally
+// decoupled from User/Issue cascade behaviour.
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  key          String
+  userId       String
+  route        String
+  fingerprint  String
+  responseJson Json
+  issueId      String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, route, key])
+  @@index([createdAt])
+}
+
 model AuditLog {
   id          String   @id @default(cuid())
   actorUserId String?
