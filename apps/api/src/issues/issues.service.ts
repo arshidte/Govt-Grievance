@@ -107,8 +107,6 @@ export class IssuesService {
   ): Promise<IssueDetailDTO> {
     await this.validate(dto);
 
-    const referenceNo = await this.issueReference.next(new Date());
-
     const { result } = await this.idempotency.run(
       {
         key: idempotencyKey,
@@ -117,6 +115,15 @@ export class IssuesService {
         fingerprint: fingerprintOf(dto),
       },
       async (tx) => {
+        // Deliberately INSIDE `work`: `IdempotencyService.run` only invokes
+        // this callback on a genuine fresh create (no key, new key, or an
+        // expired key) — never on a replay. Allocating the reference number
+        // here, rather than before `run()` is called, means a replayed
+        // request (same key + same fingerprint, racing or not) never burns
+        // a sequence value for a row that won't be created (see Task 9
+        // review carry-in from Task 7).
+        const referenceNo = await this.issueReference.next(new Date());
+
         const issue = await tx.issue.create({
           data: {
             title: dto.title,

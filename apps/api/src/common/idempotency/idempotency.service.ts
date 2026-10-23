@@ -1,10 +1,19 @@
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type IdempotencyKey } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApiError } from '../api-error';
+
+/**
+ * Read-time TTL for idempotency keys (M2 Task 9, spec §6.2): a row older
+ * than this is treated as ABSENT by every lookup in this service, even if
+ * no scheduled purge job has deleted it yet. There is deliberately no cron
+ * here — correctness comes entirely from this read-time check, not from
+ * background cleanup (which M2 does not require).
+ */
+export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface IdempotencyRunParams {
   /** Idempotency-Key header value, if the caller supplied one. */
@@ -40,13 +49,23 @@ export interface IdempotencyRunResult<T> {
  * - `key` present, existing row with a DIFFERENT `fingerprint` → the key is
  *   being reused for a different request body; reject with 409.
  *
- * NOT handled here (Task 9, deliberately deferred — see that task's brief):
- * the concurrent-same-key race (two requests racing to insert the same new
- * key both pass the "not found" check and both attempt `work` + insert; the
- * loser must catch the resulting unique-constraint violation (P2002) and
- * re-read the winner's row rather than erroring), and the 24h TTL — both the
- * read-time "is this row stale, treat as not-found" check and the periodic
- * purge job.
+ * Concurrency + expiry (M2 Task 9, spec §6.2):
+ *
+ * - **Concurrent same-key race.** The `@@unique([userId, route, key])` index
+ *   is the single authoritative arbiter. When two requests race on a brand
+ *   new key, both pass the initial "not found" check and both attempt
+ *   `work` + the key insert; the DB allows exactly one `INSERT` to commit
+ *   and aborts the other's transaction with Prisma error `P2002`. The loser
+ *   catches that (never surfacing the raw DB error) and **re-reads** the
+ *   winning row in a fresh query (the aborted transaction cannot be reused):
+ *   if the winner's `fingerprint` matches, the loser's response is the
+ *   stored one (`replayed: true`); if it differs, the loser throws the same
+ *   409 `idempotency_key_conflict` as the non-concurrent conflict path.
+ * - **Read-time TTL.** Every lookup (the initial check AND the post-P2002
+ *   re-read) treats a row with `createdAt` older than `IDEMPOTENCY_TTL_MS`
+ *   as absent, so an expired key is a fresh create even if no purge job has
+ *   ever run — M2 has no purge cron; this read-time check is the entire
+ *   correctness guarantee.
  */
 @Injectable()
 export class IdempotencyService {
@@ -58,50 +77,133 @@ export class IdempotencyService {
   ): Promise<IdempotencyRunResult<T>> {
     const { key, userId, route, fingerprint } = params;
 
-    return this.prisma.$transaction(async (tx) => {
-      if (key === undefined) {
+    if (key === undefined) {
+      return this.prisma.$transaction(async (tx) => {
         const { result } = await work(tx);
         return { result, replayed: false };
-      }
-
-      const existing = await tx.idempotencyKey.findUnique({
-        where: { userId_route_key: { userId, route, key } },
       });
+    }
 
-      if (existing) {
-        if (existing.fingerprint !== fingerprint) {
-          throw new ApiError('idempotency_key_conflict', 409, 'errors.idempotencyConflict');
+    const existing = await this.findFreshRow(userId, route, key);
+
+    if (existing) {
+      return this.replayOrConflict<T>(existing, fingerprint);
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Re-check for a fresh row INSIDE the transaction too: another
+        // request may have committed its row in the window between the
+        // lookup above and this transaction starting. Without this, two
+        // concurrent requests could both reach the `work`+insert below and
+        // rely solely on the DB unique index to catch the loser — which
+        // still works (P2002 below), but re-checking here lets a loser
+        // that arrives slightly later avoid redundantly re-running `work`.
+        const recheck = await tx.idempotencyKey.findUnique({
+          where: { userId_route_key: { userId, route, key } },
+        });
+
+        if (recheck) {
+          if (!this.isExpired(recheck)) {
+            if (recheck.fingerprint !== fingerprint) {
+              throw new ApiError('idempotency_key_conflict', 409, 'errors.idempotencyConflict');
+            }
+            return { result: recheck.responseJson as T, replayed: true };
+          }
+
+          // Expired: read-time TTL treats it as absent, but the physical
+          // row still occupies this unique triple — delete it before the
+          // `create` below, or that `create` would hit a P2002 that has
+          // nothing to do with a genuine concurrent race (it would be
+          // racing a dead key, not a live one). Deliberately a plain
+          // `delete`, not `deleteMany`: two transactions racing to expire
+          // the SAME stale row both attempt this delete, and the loser's
+          // `delete` throws Prisma `P2025` (record not found) — caught
+          // below and treated the same as the P2002 race, since both mean
+          // "someone else is also past this point for this key".
+          try {
+            await tx.idempotencyKey.delete({ where: { userId_route_key: { userId, route, key } } });
+          } catch (deleteErr) {
+            if (
+              deleteErr instanceof Prisma.PrismaClientKnownRequestError &&
+              deleteErr.code === 'P2025'
+            ) {
+              // Someone else already deleted/replaced this stale row in
+              // this instant; fall through to `work` + `create` below —
+              // if THEY also already inserted their fresh row first, our
+              // `create` will raise P2002 and the catch block below
+              // handles it exactly like any other race loser.
+            } else {
+              throw deleteErr;
+            }
+          }
         }
 
-        // Same key + same fingerprint: replay the stored response verbatim,
-        // never re-running the caller's side-effecting work.
-        return { result: existing.responseJson as T, replayed: true };
+        const { result, issueId } = await work(tx);
+
+        await tx.idempotencyKey.create({
+          data: {
+            key,
+            userId,
+            route,
+            fingerprint,
+            // `responseJson` is a Prisma `Json` column; `T` is caller-defined
+            // and not statically known to be JSON-serializable, so this cast
+            // is a deliberate, narrow escape hatch at the DB-write boundary.
+            responseJson: result as Prisma.InputJsonValue,
+            issueId,
+          },
+        });
+
+        return { result, replayed: false };
+      });
+    } catch (err) {
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
+        throw err;
       }
 
-      // TODO(Task 9): concurrent-race + TTL — a second request racing on the
-      // same new key will also reach here and attempt the same insert below;
-      // the loser must catch the resulting P2002 unique-violation and re-read
-      // the winner's row instead of propagating the raw DB error. Likewise,
-      // an `existing` row older than 24h should be treated as not-found
-      // (re-run `work`) rather than replayed/conflicted forever.
-      const { result, issueId } = await work(tx);
+      // Our own INSERT lost the race: `err`'s transaction already aborted,
+      // so it cannot be reused for a re-read — open a brand new query
+      // against `this.prisma` instead. The winning row MUST exist now (the
+      // P2002 means some row occupies this unique triple), but it is still
+      // read through the same TTL-aware lookup for consistency/paranoia.
+      const winner = await this.findFreshRow(userId, route, key);
 
-      await tx.idempotencyKey.create({
-        data: {
-          key,
-          userId,
-          route,
-          fingerprint,
-          // `responseJson` is a Prisma `Json` column; `T` is caller-defined
-          // and not statically known to be JSON-serializable, so this cast
-          // is a deliberate, narrow escape hatch at the DB-write boundary.
-          responseJson: result as Prisma.InputJsonValue,
-          issueId,
-        },
-      });
+      if (!winner) {
+        // Exceedingly unlikely (the winner's row would have to expire or
+        // be deleted in the instant between our P2002 and this re-read),
+        // but never silently swallow it — surface the conflict rather than
+        // claim success for a write that didn't happen.
+        throw new ApiError('idempotency_key_conflict', 409, 'errors.idempotencyConflict');
+      }
 
-      return { result, replayed: false };
+      return this.replayOrConflict<T>(winner, fingerprint);
+    }
+  }
+
+  /**
+   * Looks up the `(userId, route, key)` row, treating one older than
+   * `IDEMPOTENCY_TTL_MS` as not-found (read-time TTL — see class doc).
+   */
+  private async findFreshRow(userId: string, route: string, key: string): Promise<IdempotencyKey | null> {
+    const row = await this.prisma.idempotencyKey.findUnique({
+      where: { userId_route_key: { userId, route, key } },
     });
+
+    return row && !this.isExpired(row) ? row : null;
+  }
+
+  private isExpired(row: IdempotencyKey): boolean {
+    return row.createdAt.getTime() < Date.now() - IDEMPOTENCY_TTL_MS;
+  }
+
+  /** Shared replay/conflict decision for both the initial lookup and the post-P2002 re-read. */
+  private replayOrConflict<T>(row: IdempotencyKey, fingerprint: string): IdempotencyRunResult<T> {
+    if (row.fingerprint !== fingerprint) {
+      throw new ApiError('idempotency_key_conflict', 409, 'errors.idempotencyConflict');
+    }
+
+    return { result: row.responseJson as T, replayed: true };
   }
 }
 
