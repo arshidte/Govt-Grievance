@@ -7,6 +7,12 @@ export interface CreateForSubmissionParams {
   referenceNo: string;
 }
 
+export interface CreateForStatusChangeParams {
+  issueId: string;
+  recipientId: string;
+  statusHistoryId: string;
+}
+
 /**
  * Notification writes. `createForSubmission` is called from inside
  * `IssuesService.createForCitizen`'s transaction (Task 7) — it takes the
@@ -33,6 +39,33 @@ export class NotificationsService {
         type: 'issue.submitted',
         recipientId: citizenId,
         issueId,
+      },
+    });
+  }
+
+  /**
+   * Status-change notification, called from inside
+   * `IssueTransitionService.transition`'s transaction (Task 10). Like
+   * `createForSubmission`, it takes the caller's `Prisma.TransactionClient`
+   * rather than `PrismaService`, so the Notification insert is always atomic
+   * with the `IssueStatusHistory` row it documents: if either write fails, the
+   * conditional status update rolls back too, leaving the issue unchanged.
+   *
+   * The `statusHistoryId` is the id of the history row just inserted for this
+   * transition. `Notification.statusHistoryId` carries a DB-level `@unique`
+   * constraint (see `schema.prisma`), so there is at most ONE notification per
+   * history row — the backstop against a double-fired status-change notice for
+   * a single transition.
+   */
+  async createForStatusChange(tx: Prisma.TransactionClient, params: CreateForStatusChangeParams): Promise<void> {
+    const { issueId, recipientId, statusHistoryId } = params;
+
+    await tx.notification.create({
+      data: {
+        type: 'issue.status_changed',
+        recipientId,
+        issueId,
+        statusHistoryId,
       },
     });
   }
