@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import {
   createIssueSchema,
+  createOnBehalfSchema,
   transitionSchema,
   type CreateIssueInput,
+  type CreateOnBehalfInput,
   type IssueDetailDTO,
   type IssueSummaryDTO,
   type TransitionInput,
@@ -14,19 +16,24 @@ import type { SessionUser } from '../auth/session.service';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 
 import { IssuesService } from './issues.service';
+import { OnBehalfService, type OnBehalfResult } from './on-behalf.service';
 
 /**
- * `POST /issues`, `GET /issues`, `GET /issues/:id` (M2 spec §6). Every route
- * requires `AuthGuard` — even `GET /issues/:id`'s eventual 404 for an
- * out-of-scope caller must never be reachable without a session.
+ * `POST /issues`, `GET /issues`, `GET /issues/:id`, `POST /issues/on-behalf`
+ * (M2 spec §6, §9). Every route requires `AuthGuard` — even `GET
+ * /issues/:id`'s eventual 404 for an out-of-scope caller must never be
+ * reachable without a session.
  *
- * No on-behalf creation (Task 13), no status transition (Task 11), no
- * attachment upload (Task 16) here — those are separate routes/tasks.
+ * No status transition (Task 11 — see `transition` below), no attachment
+ * upload (Task 16) here — those are separate routes/tasks.
  */
 @Controller('issues')
 @UseGuards(AuthGuard)
 export class IssuesController {
-  constructor(private readonly issues: IssuesService) {}
+  constructor(
+    private readonly issues: IssuesService,
+    private readonly onBehalf: OnBehalfService,
+  ) {}
 
   /**
    * Citizen self-submission. The body is validated by `createIssueSchema`
@@ -45,6 +52,56 @@ export class IssuesController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<IssueDetailDTO> {
     return this.issues.createForCitizen(user, dto, idempotencyKey);
+  }
+
+  /**
+   * On-behalf submission by a REPRESENTATIVE (M2 spec §9, Task 13). This is
+   * a THIN HTTP wrapper — every piece of logic (ward-scope authz, per-rep
+   * rate limiting, server-side category/subcategory validation, the
+   * transactional citizen-upsert + issue-create + notification, and ALL
+   * audit logging) lives in `OnBehalfService.create` (Task 12, already
+   * reviewed/tested independently).
+   *
+   * NOTE ON AUTHORIZATION (the flagged part, same shape as `transition`
+   * above, for a DIFFERENT reason): we deliberately do NOT apply
+   * `RbacGuard`/`@Roles`/`@ScopeFrom` here.
+   *   1. Empty-scope trap: `@ScopeFrom` can only resolve scope from a route
+   *      `param`/`query`, never the request BODY — but the target ward
+   *      (`dto.wardId`) only exists in the body on this route. A `@Roles`
+   *      guard with no resolvable scope falls back to `{}`, and
+   *      `AccessControlService.can()` with an empty scope always returns
+   *      false for a REPRESENTATIVE (it requires `resourceScope.wardId` to
+   *      match an assignment) — so EVERY representative would be wrongly
+   *      403'd before ever reaching the service.
+   *   2. Denial auditing (spec §9): `OnBehalfService.create` audits every
+   *      denial (`issue.on_behalf_denied`, masked phone) as its FIRST
+   *      action, before throwing. A guard that rejected non-representatives
+   *      ahead of the service would silently skip that audit trail,
+   *      breaking the accountability guarantee. Routing every call —
+   *      allowed or denied — through the service preserves it.
+   *
+   * So this route carries ONLY the class-level `AuthGuard` (session
+   * required); 403 (non-rep / out-of-scope ward), 429 (rate-limited), 503
+   * (rate-limit backend down), and 422 (validation) ALL originate from
+   * `OnBehalfService.create`, never from this controller.
+   *
+   * Same single-source-of-idempotency pattern as `create` above: the raw
+   * `Idempotency-Key` header passes straight through; this controller does
+   * NOT compute a fingerprint (`OnBehalfService.create` owns that, via
+   * `fingerprintOf(dto)`). The body is validated against the canonical
+   * `createOnBehalfSchema` (`citizenPhone`, no `panchayatId` — the rep's
+   * ward implies the panchayat server-side), and the return type is
+   * `OnBehalfResult` — the service's own minimal 4-key shape — referenced
+   * here, not redefined, so this controller cannot silently drift from it.
+   */
+  @Post('on-behalf')
+  @HttpCode(201)
+  async createOnBehalf(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(createOnBehalfSchema)) dto: CreateOnBehalfInput,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ): Promise<OnBehalfResult> {
+    return this.onBehalf.create(user, dto, idempotencyKey);
   }
 
   /**
