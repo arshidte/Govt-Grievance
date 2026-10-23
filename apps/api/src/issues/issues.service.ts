@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { CreateIssueInput, IssueDetailDTO, IssueSummaryDTO } from '@pg/types';
+import type {
+  CreateIssueInput,
+  IssueDetailDTO,
+  IssueStatusHistoryDTO,
+  IssueSummaryDTO,
+  Role,
+  TransitionInput,
+} from '@pg/types';
 import type { Prisma } from '@prisma/client';
 
 import { AccessControlService } from '../access/access-control.service';
@@ -10,6 +17,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { IssueReferenceService } from './issue-reference.service';
+import { IssueTransitionService } from './issue-transition.service';
 
 /** `POST /issues` route identifier, used to scope idempotency keys. */
 const CREATE_ISSUE_ROUTE = 'POST /issues';
@@ -38,6 +46,59 @@ function toIssueSummaryDTO(issue: {
     priority: issue.priority,
     categoryId: issue.categoryId,
     createdAt: issue.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Staff roles in DESCENDING privilege order. When an actor holds several staff
+ * roles, the timeline's `actorRoleLabel` is resolved deterministically to the
+ * most-privileged one (ADMIN > COORDINATOR > REPRESENTATIVE) so the label is
+ * stable regardless of `RoleAssignment` row ordering.
+ */
+const STAFF_ROLE_PRIVILEGE: Role[] = ['ADMIN', 'COORDINATOR', 'REPRESENTATIVE'];
+
+/**
+ * Shape of an `IssueStatusHistory` row as selected for the timeline. The acting
+ * user is included via `changedBy` with ONLY its `roleAssignments.role`
+ * selected — never name/phone/email/id — so the DTO can expose a non-PII role
+ * label (see `IssueStatusHistoryDTO`'s "exposes role label, never actor PII"
+ * contract; this timeline is visible to the filing citizen).
+ */
+type HistoryRow = {
+  id: string;
+  fromStatus: IssueRow['status'];
+  toStatus: IssueRow['status'];
+  note: string | null;
+  createdAt: Date;
+  changedById: string | null;
+  changedBy: { roleAssignments: { role: string }[] } | null;
+};
+
+/**
+ * Derives the stable, localizable `actorRoleLabel` for a timeline entry from
+ * the acting user's STAFF ROLE — never any PII. `null` when the row has no
+ * recorded actor (legacy/backfilled rows per schema §4.5) OR when the actor
+ * holds no staff role (e.g. a citizen's own action, should not occur for
+ * transitions but handled defensively). With multiple staff roles, the
+ * most-privileged (ADMIN > COORDINATOR > REPRESENTATIVE) is chosen.
+ */
+function actorRoleLabelOf(row: HistoryRow): string | null {
+  if (!row.changedById || !row.changedBy) {
+    return null;
+  }
+
+  const roles = new Set(row.changedBy.roleAssignments.map((ra) => ra.role));
+  return STAFF_ROLE_PRIVILEGE.find((role) => roles.has(role)) ?? null;
+}
+
+function toIssueStatusHistoryDTO(row: HistoryRow): IssueStatusHistoryDTO {
+  return {
+    id: row.id,
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    note: row.note,
+    actorRoleLabel: actorRoleLabelOf(row),
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -98,6 +159,7 @@ export class IssuesService {
     private readonly idempotency: IdempotencyService,
     private readonly notifications: NotificationsService,
     private readonly accessControl: AccessControlService,
+    private readonly transitions: IssueTransitionService,
   ) {}
 
   async createForCitizen(
@@ -194,13 +256,85 @@ export class IssuesService {
       throw new ApiError('issue_not_found', 404, 'errors.issueNotFound');
     }
 
-    const issue = await this.prisma.issue.findFirst({ where: { ...where, id } });
+    const issue = await this.prisma.issue.findFirst({
+      where: { ...where, id },
+      include: {
+        statusHistory: {
+          // Ascending by createdAt: the timeline is chronological, oldest
+          // event first (M2 Task 11 / spec §5).
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            fromStatus: true,
+            toStatus: true,
+            note: true,
+            createdAt: true,
+            changedById: true,
+            // PII-safe: select ONLY the acting user's role assignments'
+            // `role` — never name/phone/email/id — so the citizen-visible
+            // timeline exposes a role label and nothing identifying.
+            changedBy: { select: { roleAssignments: { select: { role: true } } } },
+          },
+        },
+      },
+    });
 
     if (!issue) {
       throw new ApiError('issue_not_found', 404, 'errors.issueNotFound');
     }
 
-    return toIssueDetailDTO(issue);
+    const detail = toIssueDetailDTO(issue);
+    detail.timeline = issue.statusHistory.map(toIssueStatusHistoryDTO);
+    return detail;
+  }
+
+  /**
+   * Scope-gated status transition (M2 Task 11 / spec §5.1–5.3, §6).
+   *
+   * This is the AUTHORIZATION gate the `PATCH /issues/:id/status` endpoint
+   * needs that `RbacGuard`/`@ScopeFrom` CANNOT provide: that guard resolves
+   * scope from a ward/panchayat URL param, but here `:id` is an ISSUE id, so
+   * the guard would resolve scope to `{}` and wrongly 403 every non-admin
+   * staff member. Instead we reuse the SAME decision engine the guard uses —
+   * `AccessControlService` — but source the scope from the issue ROW
+   * (`wardId` + `panchayatId`), exactly how the guard would resolve it.
+   *
+   * Order is deliberate (see brief §6 / 403-vs-404 contract):
+   * 1. Non-staff (citizen, even the issue owner) → 403 BEFORE any DB load, so
+   *    a citizen gets no existence disclosure.
+   * 2. Load the issue; missing → 404.
+   * 3. Out-of-scope staff → 403 (existence IS disclosed to staff here — this
+   *    is intentionally different from GET's uniform-404 non-disclosure).
+   * 4. In-scope → delegate to `IssueTransitionService.transition` (Task 10;
+   *    its concurrency logic is untouched and carries NO authz of its own),
+   *    then re-read via the scoped `getForUser` so the response carries the
+   *    now-populated, chronological timeline.
+   */
+  async transitionForUser(user: SessionUser, id: string, input: TransitionInput): Promise<IssueDetailDTO> {
+    if (!this.accessControl.isStaff(user)) {
+      throw new ApiError('forbidden', 403, 'states.forbidden');
+    }
+
+    const issue = await this.prisma.issue.findUnique({ where: { id } });
+    if (!issue) {
+      throw new ApiError('issue_not_found', 404, 'errors.issueNotFound');
+    }
+
+    const inScope = this.accessControl.can(user, 'issue:update', {
+      wardId: issue.wardId,
+      panchayatId: issue.panchayatId,
+    });
+    if (!inScope) {
+      throw new ApiError('forbidden', 403, 'states.forbidden');
+    }
+
+    await this.transitions.transition(user, id, input);
+
+    // Re-read scoped: the transition service returns a bare `timeline: []`
+    // DTO (Task 10 is not timeline-aware); `getForUser` is the single place
+    // that hydrates the ordered, PII-safe timeline for both this PATCH
+    // response and a subsequent GET.
+    return this.getForUser(user, id);
   }
 
   /**

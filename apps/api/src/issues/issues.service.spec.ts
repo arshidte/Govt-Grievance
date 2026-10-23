@@ -13,6 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { IssueReferenceService } from './issue-reference.service';
+import { IssueTransitionService } from './issue-transition.service';
 import { IssuesService } from './issues.service';
 
 let counter = 0;
@@ -30,7 +31,8 @@ describe('IssuesService', () => {
   const notifications = new NotificationsService();
   const issueReference = new IssueReferenceService(prisma);
   const accessControl = new AccessControlService();
-  const service = new IssuesService(prisma, issueReference, idempotency, notifications, accessControl);
+  const transitions = new IssueTransitionService(prisma, notifications);
+  const service = new IssuesService(prisma, issueReference, idempotency, notifications, accessControl, transitions);
 
   // Shared seed fixtures, created once for the whole suite.
   let citizen: SessionUser;

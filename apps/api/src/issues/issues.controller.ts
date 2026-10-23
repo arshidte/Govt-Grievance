@@ -1,5 +1,12 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
-import { createIssueSchema, type CreateIssueInput, type IssueDetailDTO, type IssueSummaryDTO } from '@pg/types';
+import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  createIssueSchema,
+  transitionSchema,
+  type CreateIssueInput,
+  type IssueDetailDTO,
+  type IssueSummaryDTO,
+  type TransitionInput,
+} from '@pg/types';
 
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -61,5 +68,32 @@ export class IssuesController {
   @Get(':id')
   async get(@CurrentUser() user: SessionUser, @Param('id') id: string): Promise<IssueDetailDTO> {
     return this.issues.getForUser(user, id);
+  }
+
+  /**
+   * Scoped staff status transition (M2 Task 11 / spec §5.1–5.3, §6).
+   *
+   * NOTE ON AUTHORIZATION (this is the flagged part): we do NOT apply
+   * `RbacGuard`/`@Roles`/`@ScopeFrom` here. `:id` is an ISSUE id, not a
+   * ward/panchayat id, so `RbacGuard` could not resolve scope from it and
+   * would resolve `{}` → wrongly 403 every non-admin staff member. Instead the
+   * scope gate lives in `IssuesService.transitionForUser`, which reuses the
+   * SAME `AccessControlService` decision engine the guard uses but sources the
+   * scope from the issue ROW (`wardId`/`panchayatId`). Shared guard infra
+   * (`rbac.guard.ts`/`scope.ts`/`roles.decorator.ts`) is untouched.
+   *
+   * The body is validated against the CANONICAL `transitionSchema` (mandatory
+   * `note`), NOT the looser local interface in the Task-10 service.
+   *
+   * Outcomes: citizen → 403; nonexistent id → 404; out-of-scope staff → 403;
+   * in-scope staff → 200 with the updated, chronologically-ordered timeline.
+   */
+  @Patch(':id/status')
+  async transition(
+    @CurrentUser() user: SessionUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(transitionSchema)) dto: TransitionInput,
+  ): Promise<IssueDetailDTO> {
+    return this.issues.transitionForUser(user, id, dto);
   }
 }
