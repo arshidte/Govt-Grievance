@@ -4,6 +4,7 @@ import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 
+import { AttachmentsController } from './attachments.controller';
 import { AttachmentsService } from './attachments.service';
 import { LocalDiskStorageProvider } from './storage/local-disk.storage';
 import { STORAGE_PROVIDER } from './storage/storage.provider';
@@ -17,12 +18,12 @@ import { STORAGE_PROVIDER } from './storage/storage.provider';
  *
  * `PrismaModule` supplies `PrismaService` (attachment/issue rows),
  * `AccessModule` supplies `AccessControlService` (the download in-scope-staff
- * decision), and `AuthModule` supplies `AuthGuard`/`AuthService` for the
- * controller added in Task 16. `AttachmentsService` is exported so that
- * controller can consume it.
+ * decision), and `AuthModule` supplies `AuthGuard`/`AuthService` for
+ * `AttachmentsController` (Task 16), registered below.
  */
 @Module({
   imports: [PrismaModule, AccessModule, AuthModule],
+  controllers: [AttachmentsController],
   providers: [
     AttachmentsService,
     // `useFactory` (not `useClass`) because `LocalDiskStorageProvider`'s
