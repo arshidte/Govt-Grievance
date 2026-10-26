@@ -7,10 +7,12 @@ import type {
   IssueSummaryDTO,
   MeResponse,
   NotificationDTO,
+  PanchayatDTO,
   RequestOtpInput,
   TransitionInput,
   UpdateProfileInput,
   VerifyOtpInput,
+  WardDTO,
 } from '@pg/types';
 
 /** All backend routes are served under this version prefix (see apps/api main.ts `setGlobalPrefix`). */
@@ -83,6 +85,8 @@ export interface ApiClient {
   logout(): Promise<OkResponse>;
   getMe(): Promise<MeResponse>;
   getCategories(): Promise<CategoryDTO[]>;
+  getPanchayats(): Promise<PanchayatDTO[]>;
+  getWards(panchayatId: string): Promise<WardDTO[]>;
   updateProfile(input: UpdateProfileInput): Promise<MeResponse>;
   createIssue(input: CreateIssueInput, idempotencyKey?: string): Promise<IssueDetailDTO>;
   createOnBehalf(input: CreateOnBehalfInput, idempotencyKey?: string): Promise<OnBehalfResult>;
@@ -171,6 +175,11 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     getMe: () => request<MeResponse>('/auth/me', { method: 'GET' }),
 
     getCategories: () => request<CategoryDTO[]>('/categories', { method: 'GET' }),
+
+    getPanchayats: () => request<PanchayatDTO[]>('/panchayats', { method: 'GET' }),
+
+    getWards: (panchayatId) =>
+      request<WardDTO[]>(`/panchayats/${encodeURIComponent(panchayatId)}/wards`, { method: 'GET' }),
 
     updateProfile: (input) =>
       request<MeResponse>('/users/me', {

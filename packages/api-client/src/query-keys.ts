@@ -5,6 +5,10 @@
 export const queryKeys = {
   me: ['me'] as const,
   categories: ['categories'] as const,
+  /** All panchayats (org read for the submission wizard's panchayat select). */
+  panchayats: ['panchayats'] as const,
+  /** Wards belonging to a single panchayat; keyed on the panchayat id so each parent caches separately. */
+  wards: (panchayatId: string) => ['wards', panchayatId] as const,
   /** List-level key; shares the `['issues']` prefix with `issue(id)` below so invalidating `issues` cascades to every per-id cache entry too. */
   issues: ['issues'] as const,
   /** Detail key for a single issue. Same `['issues']` prefix as `issues` above — see note there. */

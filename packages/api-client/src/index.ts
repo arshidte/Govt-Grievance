@@ -5,6 +5,7 @@ export { queryKeys } from './query-keys';
 
 export { useRequestOtp, useVerifyOtp, useLogout, useMe } from './auth';
 export { useCategories } from './catalog';
+export { usePanchayats, useWards } from './org';
 export { useUpdateProfile } from './profile';
 export {
   useIssues,
