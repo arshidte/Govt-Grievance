@@ -105,11 +105,36 @@
     "emptyTitle": "No notifications yet",
     "emptyDescription": "We'll let you know here when there's an update on your issues."
   },
+  "issues": {
+    "dashboardTitle": "Your issues",
+    "dashboardSubtitle": "Everything you've reported, with its latest status.",
+    "loadFailed": "Could not load your issues.",
+    "emptyTitle": "No issues reported yet",
+    "emptyDescription": "Issues you report will appear here with their status.",
+    "reportCta": "Report an issue",
+    "referenceLabel": "Reference",
+    "createdOnLabel": "Reported on {date}",
+    "createdAtLabel": "Reported on",
+    "detailTitle": "Issue details",
+    "categoryLabel": "Category",
+    "locationLabel": "Location",
+    "descriptionLabel": "Description",
+    "attachmentLabel": "Attached photo",
+    "attachmentAlt": "Photo attached to this issue",
+    "downloadAttachment": "Download attachment",
+    "notFoundTitle": "Issue not found",
+    "notFoundDescription": "This issue doesn't exist, or you don't have access to it.",
+    "backToDashboard": "Back to your issues",
+    "timelineTitle": "Status history",
+    "timelineEmpty": "No updates yet.",
+    "timelineFromTo": "{from} → {to}",
+    "timelineSystemActor": "—"
+  },
   "bottomNav": {
     "navLabel": "Primary",
     "home": "Home",
     "report": "Report",
-    "track": "Track",
+    "issues": "Issues",
     "profile": "Profile"
   },
   "languageSwitcher": {
@@ -190,6 +215,10 @@
     "landAndEncroachment": "Land and encroachment",
     "publicSafety": "Public safety",
     "other": "Other"
+  },
+  "errors": {
+    "issueNotFound": "This issue doesn't exist, or you don't have access to it.",
+    "generic": "Something went wrong. Please try again."
   },
   "admin": {
     "loginTitle": "Staff sign in",

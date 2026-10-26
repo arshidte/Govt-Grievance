@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 interface NavItem {
-  key: 'home' | 'report' | 'track' | 'profile';
+  key: 'home' | 'report' | 'issues' | 'profile';
   /** Href relative to the locale prefix (e.g. `/home` -> `/${locale}/home`). */
   href: string;
   /** Whether this item's "current page" state should be matched against the pathname. */
@@ -13,17 +13,18 @@ interface NavItem {
 }
 
 /**
- * NOTE: "Report" (issue creation) is M2 scope — there is no `/report` page
- * yet, so this item currently links to the public landing page's primary
- * CTA (`/`), which is the nearest existing entry point toward reporting an
- * issue. The nav ITEM stays present (per the brief) so the shell's layout
- * and information architecture don't change again once M2 lands; only its
- * destination will need to flip to a real `/report` route then.
+ * Task 22: the former "Track" slot (a placeholder pointing at the public
+ * `/track` reference-number lookup — see that page's own comment on why a
+ * real authed lookup was deferred) now points at `/issues`, the real authed
+ * issue dashboard. `/track` itself is UNCHANGED and still reachable
+ * (pre-auth visitors use it directly, per `middleware.ts` PUBLIC_PATHS) —
+ * only this signed-in shell's nav destination moved, since "my issues" is
+ * strictly more useful to an authed citizen than the pre-auth lookup form.
  */
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', href: '/home', matchPrefix: '/home' },
-  { key: 'report', href: '/', matchPrefix: '/report' },
-  { key: 'track', href: '/track', matchPrefix: '/track' },
+  { key: 'report', href: '/report', matchPrefix: '/report' },
+  { key: 'issues', href: '/issues', matchPrefix: '/issues' },
   { key: 'profile', href: '/profile', matchPrefix: '/profile' },
 ];
 
@@ -36,7 +37,7 @@ function stripLocale(pathname: string, locale: string): string {
 }
 
 /**
- * Sticky bottom navigation for the authed shell: Home / Report / Track /
+ * Sticky bottom navigation for the authed shell: Home / Report / Issues /
  * Profile. Each item is a real `<Link>` (not a button) so it's reachable
  * via normal browser navigation and screen-reader rotor "links" lists.
  *

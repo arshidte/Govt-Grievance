@@ -162,7 +162,14 @@ const colorClasses: Record<string, string> = {
  * through @pg/i18n's `statusLabelKey`, never hardcoding English strings.
  */
 export function StatusBadge({ status, t, className }: StatusBadgeProps) {
-  const { tokenKey, Icon } = STATUS_DESCRIPTORS[status];
+  // `status` is typed as the exhaustive `Status` union, but the VALUE at
+  // runtime originates from an API response (not re-validated client-side),
+  // so an unrecognized string can still arrive (e.g. a future status added
+  // server-side before the client ships support for it). Fall back to the
+  // SUBMITTED descriptor in that case — same fallback `statusLabelKey`
+  // already applies to the label — rather than letting an unguarded lookup
+  // throw and crash the page.
+  const { tokenKey, Icon } = STATUS_DESCRIPTORS[status] ?? STATUS_DESCRIPTORS.SUBMITTED;
   const label = t(statusLabelKey(status));
 
   return (

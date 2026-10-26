@@ -105,11 +105,36 @@
     "emptyTitle": "ഇതുവരെ അറിയിപ്പുകൾ ഒന്നുമില്ല",
     "emptyDescription": "നിങ്ങളുടെ പരാതികളിൽ പുതിയ വിവരങ്ങൾ ഉണ്ടാകുമ്പോൾ ഞങ്ങൾ ഇവിടെ അറിയിക്കും."
   },
+  "issues": {
+    "dashboardTitle": "നിങ്ങളുടെ പരാതികൾ",
+    "dashboardSubtitle": "നിങ്ങൾ രേഖപ്പെടുത്തിയ എല്ലാ പരാതികളും, അവയുടെ ഏറ്റവും പുതിയ സ്ഥിതിയോടെ.",
+    "loadFailed": "നിങ്ങളുടെ പരാതികൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "emptyTitle": "ഇതുവരെ പരാതികൾ രേഖപ്പെടുത്തിയിട്ടില്ല",
+    "emptyDescription": "നിങ്ങൾ രേഖപ്പെടുത്തുന്ന പരാതികൾ അവയുടെ സ്ഥിതിയോടെ ഇവിടെ കാണാം.",
+    "reportCta": "പരാതി രേഖപ്പെടുത്തുക",
+    "referenceLabel": "റഫറൻസ്",
+    "createdOnLabel": "{date} തീയതിയിൽ രേഖപ്പെടുത്തി",
+    "createdAtLabel": "രേഖപ്പെടുത്തിയ തീയതി",
+    "detailTitle": "പരാതിയുടെ വിവരങ്ങൾ",
+    "categoryLabel": "വിഭാഗം",
+    "locationLabel": "സ്ഥലം",
+    "descriptionLabel": "വിവരണം",
+    "attachmentLabel": "അറ്റാച്ച് ചെയ്ത ഫോട്ടോ",
+    "attachmentAlt": "ഈ പരാതിയുമായി ബന്ധിപ്പിച്ച ഫോട്ടോ",
+    "downloadAttachment": "അറ്റാച്ച്‌മെന്റ് ഡൗൺലോഡ് ചെയ്യുക",
+    "notFoundTitle": "പരാതി കണ്ടെത്തിയില്ല",
+    "notFoundDescription": "ഈ പരാതി നിലവിലില്ല, അല്ലെങ്കിൽ നിങ്ങൾക്ക് ഇതിലേക്ക് പ്രവേശനം ഇല്ല.",
+    "backToDashboard": "നിങ്ങളുടെ പരാതികളിലേക്ക് തിരികെ",
+    "timelineTitle": "സ്ഥിതി ചരിത്രം",
+    "timelineEmpty": "ഇതുവരെ പുതുക്കലുകൾ ഒന്നുമില്ല.",
+    "timelineFromTo": "{from} → {to}",
+    "timelineSystemActor": "—"
+  },
   "bottomNav": {
     "navLabel": "പ്രധാന നാവിഗേഷൻ",
     "home": "ഹോം",
     "report": "റിപ്പോർട്ട്",
-    "track": "ട്രാക്ക്",
+    "issues": "പരാതികൾ",
     "profile": "പ്രൊഫൈൽ"
   },
   "languageSwitcher": {
@@ -190,6 +215,10 @@
     "landAndEncroachment": "ഭൂമിയും കയ്യേറ്റവും",
     "publicSafety": "പൊതു സുരക്ഷ",
     "other": "മറ്റുള്ളവ"
+  },
+  "errors": {
+    "issueNotFound": "ഈ പരാതി നിലവിലില്ല, അല്ലെങ്കിൽ നിങ്ങൾക്ക് ഇതിലേക്ക് പ്രവേശനം ഇല്ല.",
+    "generic": "എന്തോ പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക."
   },
   "admin": {
     "loginTitle": "സ്റ്റാഫ് സൈൻ ഇൻ",
