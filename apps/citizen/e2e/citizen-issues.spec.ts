@@ -64,6 +64,15 @@ function devPhone(): string {
 }
 
 /**
+ * API origin (the Playwright webServer boots it on :4000). The dev-only OTP
+ * endpoint lives on the API itself and MUST be read from here directly: the
+ * citizen BFF's hardened allowlist (Task 18 — see
+ * `apps/citizen/src/lib/bff-allowlist.ts`) does not forward `dev/*`, so
+ * reading it via the citizen app's own origin (`baseURL`, :3000) 404s.
+ */
+const API_BASE = 'http://localhost:4000';
+
+/**
  * Logs a brand-new citizen in via the same dev-OTP sequence as
  * `citizen-auth.spec.ts` (duplicated here rather than imported, per this
  * task's instructions to not modify that file): `/` -> `landing-login-link`
@@ -72,7 +81,7 @@ function devPhone(): string {
  * `fullName` yet, so it is routed to `/register` -> fill full name and save
  * -> lands on `/home`.
  */
-async function loginNewCitizen(page: Page, baseURL: string | undefined, phone: string): Promise<void> {
+async function loginNewCitizen(page: Page, _baseURL: string | undefined, phone: string): Promise<void> {
   await page.goto('/');
   await page.getByTestId('landing-login-link').click();
   await expect(page).toHaveURL(/\/login$/);
@@ -82,7 +91,7 @@ async function loginNewCitizen(page: Page, baseURL: string | undefined, phone: s
   await expect(page).toHaveURL(/\/verify\?phone=/);
 
   const lastOtpResponse = await page.request.get(
-    `${baseURL}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
+    `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
   );
   expect(lastOtpResponse.ok()).toBe(true);
   const { code } = (await lastOtpResponse.json()) as { code: string };
