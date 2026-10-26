@@ -115,18 +115,18 @@ describe('m2_issue_lifecycle migration — populated legacy-data safety', () => 
 
     await runM2Migration();
 
-    const rows = await db.$queryRawUnsafe<any[]>(
-      `SELECT "fromStatus","toStatus","changedById" FROM "IssueStatusHistory"`,
-    );
+    const rows = await db.$queryRawUnsafe<
+      { fromStatus: string; toStatus: string; changedById: string | null }[]
+    >(`SELECT "fromStatus","toStatus","changedById" FROM "IssueStatusHistory"`);
     expect(rows).toHaveLength(1);
-    expect(rows[0].fromStatus).toBe('SUBMITTED');
-    expect(rows[0].toStatus).toBe('SUBMITTED');
-    expect(rows[0].changedById).toBeNull();
+    expect(rows[0]?.fromStatus).toBe('SUBMITTED');
+    expect(rows[0]?.toStatus).toBe('SUBMITTED');
+    expect(rows[0]?.changedById).toBeNull();
 
-    const cols = await db.$queryRawUnsafe<any[]>(
+    const cols = await db.$queryRawUnsafe<{ column_name: string }[]>(
       `SELECT column_name FROM information_schema.columns WHERE table_name='IssueStatusHistory'`,
     );
-    expect(cols.map((c: any) => c.column_name)).not.toContain('status');
+    expect(cols.map((c) => c.column_name)).not.toContain('status');
   });
 
   it('maps ALL TEN known legacy status values directly (from=to=value, note NULL)', async () => {
@@ -146,14 +146,14 @@ describe('m2_issue_lifecycle migration — populated legacy-data safety', () => 
 
     await runM2Migration();
 
-    const rows = await db.$queryRawUnsafe<any[]>(
+    const rows = await db.$queryRawUnsafe<{ fromStatus: string; toStatus: string; note: string | null }[]>(
       `SELECT "fromStatus","toStatus","note" FROM "IssueStatusHistory" ORDER BY "createdAt"`,
     );
     expect(rows).toHaveLength(known.length);
     for (let i = 0; i < known.length; i++) {
-      expect(rows[i].fromStatus).toBe(known[i]);
-      expect(rows[i].toStatus).toBe(known[i]);
-      expect(rows[i].note).toBeNull();
+      expect(rows[i]?.fromStatus).toBe(known[i]);
+      expect(rows[i]?.toStatus).toBe(known[i]);
+      expect(rows[i]?.note).toBeNull();
     }
   });
 
@@ -165,13 +165,13 @@ describe('m2_issue_lifecycle migration — populated legacy-data safety', () => 
 
       await expect(runM2Migration()).resolves.not.toThrow();
 
-      const rows = await db.$queryRawUnsafe<any[]>(
+      const rows = await db.$queryRawUnsafe<{ fromStatus: string; toStatus: string; note: string | null }[]>(
         `SELECT "fromStatus","toStatus","note" FROM "IssueStatusHistory"`,
       );
       expect(rows).toHaveLength(1);
-      expect(rows[0].toStatus).toBe('SUBMITTED');
-      expect(rows[0].fromStatus).toBe('SUBMITTED');
-      expect(rows[0].note).toBe('migrated: unrecognized legacy status "WEIRD_OLD_VALUE"');
+      expect(rows[0]?.toStatus).toBe('SUBMITTED');
+      expect(rows[0]?.fromStatus).toBe('SUBMITTED');
+      expect(rows[0]?.note).toBe('migrated: unrecognized legacy status "WEIRD_OLD_VALUE"');
     },
   );
 
@@ -180,8 +180,10 @@ describe('m2_issue_lifecycle migration — populated legacy-data safety', () => 
 
     await runM2Migration();
 
-    const next = await db.$queryRawUnsafe<any[]>(`SELECT nextval('issue_reference_seq') AS n`);
-    expect(Number(next[0].n)).toBeGreaterThan(5); // i.e. 6 -> GRV-YYYY-000006, never 000005
+    const next = await db.$queryRawUnsafe<{ n: number | bigint }[]>(
+      `SELECT nextval('issue_reference_seq') AS n`,
+    );
+    expect(Number(next[0]?.n)).toBeGreaterThan(5); // i.e. 6 -> GRV-YYYY-000006, never 000005
   });
 
   it('loses zero rows across a mixed known+unknown legacy history set', async () => {
@@ -189,12 +191,16 @@ describe('m2_issue_lifecycle migration — populated legacy-data safety', () => 
     await seedLegacyHistoryRows(known);
     await seedLegacyHistoryRows(['ANOTHER_UNKNOWN_VALUE']);
 
-    const before = await db.$queryRawUnsafe<any[]>(`SELECT count(*)::int AS c FROM "IssueStatusHistory"`);
+    const before = await db.$queryRawUnsafe<{ c: number }[]>(
+      `SELECT count(*)::int AS c FROM "IssueStatusHistory"`,
+    );
 
     await runM2Migration();
 
-    const after = await db.$queryRawUnsafe<any[]>(`SELECT count(*)::int AS c FROM "IssueStatusHistory"`);
-    expect(after[0].c).toBe(before[0].c);
-    expect(after[0].c).toBe(known.length + 1);
+    const after = await db.$queryRawUnsafe<{ c: number }[]>(
+      `SELECT count(*)::int AS c FROM "IssueStatusHistory"`,
+    );
+    expect(after[0]?.c).toBe(before[0]?.c);
+    expect(after[0]?.c).toBe(known.length + 1);
   });
 });

@@ -38,17 +38,17 @@ describe('createIssueSchema', () => {
   });
 
   it('rejects missing categoryId', () => {
-    const { categoryId, ...rest } = valid;
+    const { categoryId: _categoryId, ...rest } = valid;
     expect(createIssueSchema.safeParse(rest).success).toBe(false);
   });
 
   it('rejects missing panchayatId', () => {
-    const { panchayatId, ...rest } = valid;
+    const { panchayatId: _panchayatId, ...rest } = valid;
     expect(createIssueSchema.safeParse(rest).success).toBe(false);
   });
 
   it('rejects missing wardId', () => {
-    const { wardId, ...rest } = valid;
+    const { wardId: _wardId, ...rest } = valid;
     expect(createIssueSchema.safeParse(rest).success).toBe(false);
   });
 });
@@ -71,7 +71,7 @@ describe('createOnBehalfSchema', () => {
   });
 
   it('rejects missing citizenPhone', () => {
-    const { citizenPhone, ...rest } = valid;
+    const { citizenPhone: _citizenPhone, ...rest } = valid;
     expect(createOnBehalfSchema.safeParse(rest).success).toBe(false);
   });
 
