@@ -103,7 +103,16 @@
   "notifications": {
     "title": "Notifications",
     "emptyTitle": "No notifications yet",
-    "emptyDescription": "We'll let you know here when there's an update on your issues."
+    "emptyDescription": "We'll let you know here when there's an update on your issues.",
+    "loadFailed": "Could not load your notifications.",
+    "bellLabel": "Notifications, {count} unread",
+    "unreadLabel": "Unread",
+    "readLabel": "Read",
+    "message": {
+      "issueSubmitted": "Your issue has been submitted.",
+      "issueStatusChanged": "There's a status update on your issue.",
+      "unknown": "You have a new notification."
+    }
   },
   "issues": {
     "dashboardTitle": "Your issues",
