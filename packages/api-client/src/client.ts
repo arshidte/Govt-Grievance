@@ -1,7 +1,14 @@
 import type {
+  AttachmentDTO,
   CategoryDTO,
+  CreateIssueInput,
+  CreateOnBehalfInput,
+  IssueDetailDTO,
+  IssueSummaryDTO,
   MeResponse,
+  NotificationDTO,
   RequestOtpInput,
+  TransitionInput,
   UpdateProfileInput,
   VerifyOtpInput,
 } from '@pg/types';
@@ -45,6 +52,19 @@ export interface OkResponse {
   ok: true;
 }
 
+/**
+ * Minimal 4-key shape returned by `POST /issues/on-behalf`. No equivalent
+ * DTO exists in `@pg/types` (the API's own `OnBehalfResult` — see
+ * `apps/api/src/issues/on-behalf.service.ts` — lives server-side only), so
+ * this mirrors it locally rather than reaching into the API package.
+ */
+export interface OnBehalfResult {
+  referenceNo: string;
+  id: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface CreateApiClientOptions {
   /** Origin (and optional path prefix) of the API, WITHOUT `/api/v1` — e.g. `https://api.example.com`. */
   baseUrl: string;
@@ -64,6 +84,15 @@ export interface ApiClient {
   getMe(): Promise<MeResponse>;
   getCategories(): Promise<CategoryDTO[]>;
   updateProfile(input: UpdateProfileInput): Promise<MeResponse>;
+  createIssue(input: CreateIssueInput, idempotencyKey?: string): Promise<IssueDetailDTO>;
+  createOnBehalf(input: CreateOnBehalfInput, idempotencyKey?: string): Promise<OnBehalfResult>;
+  listIssues(params?: { status?: string }): Promise<IssueSummaryDTO[]>;
+  getIssue(id: string): Promise<IssueDetailDTO>;
+  transitionIssue(id: string, input: TransitionInput): Promise<IssueDetailDTO>;
+  uploadAttachment(issueId: string, file: Blob | File): Promise<AttachmentDTO>;
+  listNotifications(): Promise<NotificationDTO[]>;
+  unreadCount(): Promise<{ count: number }>;
+  markNotificationRead(id: string): Promise<NotificationDTO>;
 }
 
 /**
@@ -79,7 +108,15 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const url = `${baseUrl}${API_PREFIX}${path}`;
     const headers = new Headers(init?.headers);
-    if (init?.body !== undefined && !headers.has('Content-Type')) {
+    // FormData bodies (multipart uploads) must NOT get a JSON content-type —
+    // the browser/fetch needs to set its own `multipart/form-data;
+    // boundary=...` based on the actual FormData contents. Forcing
+    // `application/json` here would silently break the multipart upload.
+    if (
+      init?.body !== undefined &&
+      !headers.has('Content-Type') &&
+      !(init.body instanceof FormData)
+    ) {
       headers.set('Content-Type', 'application/json');
     }
 
@@ -140,5 +177,48 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
+
+    createIssue: (input, idempotencyKey) =>
+      request<IssueDetailDTO>('/issues', {
+        method: 'POST',
+        body: JSON.stringify(input),
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      }),
+
+    createOnBehalf: (input, idempotencyKey) =>
+      request<OnBehalfResult>('/issues/on-behalf', {
+        method: 'POST',
+        body: JSON.stringify(input),
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+      }),
+
+    listIssues: (params) => {
+      const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+      return request<IssueSummaryDTO[]>(`/issues${query}`, { method: 'GET' });
+    },
+
+    getIssue: (id) => request<IssueDetailDTO>(`/issues/${encodeURIComponent(id)}`, { method: 'GET' }),
+
+    transitionIssue: (id, input) =>
+      request<IssueDetailDTO>(`/issues/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
+    uploadAttachment: (issueId, file) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return request<AttachmentDTO>(`/issues/${encodeURIComponent(issueId)}/attachment`, {
+        method: 'POST',
+        body: fd,
+      });
+    },
+
+    listNotifications: () => request<NotificationDTO[]>('/notifications', { method: 'GET' }),
+
+    unreadCount: () => request<{ count: number }>('/notifications/unread-count', { method: 'GET' }),
+
+    markNotificationRead: (id) =>
+      request<NotificationDTO>(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }),
   };
 }
