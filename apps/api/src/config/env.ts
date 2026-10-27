@@ -38,6 +38,15 @@ const envSchema = z.object({
   OTP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: z.coerce.number().int().positive().default(5),
+  // Per-IP request limit for `/auth/*` routes within a 60s window, enforced
+  // by the global throttler (see src/common/throttler.config.ts, which now
+  // sources this validated value so there is ONE config contract). The
+  // PRODUCTION value is fixed at the default 5 (strict — auth endpoints are
+  // throttled harder than general routes). It is overridable ONLY outside
+  // production (the Playwright browser e2e performs many real OTP logins from
+  // a single IP and raises it); the production guard below rejects any
+  // non-default override so a relaxed limit can never ship.
+  AUTH_THROTTLE_LIMIT: z.coerce.number().int().positive().default(5),
   // Max on-behalf issues one representative may file per rolling hour (M2
   // Task 12 / spec §9). Fail-safe default of 20; enforced per-rep with a
   // DB-backed counter that FAILS CLOSED if the count query errors.
@@ -61,6 +70,21 @@ const envSchema = z.object({
       path: ['SMS_PROVIDER'],
       message:
         'SMS_PROVIDER must not be "mock" in production — configure a real SMS provider.',
+    });
+  }
+
+  // Fail closed: the tight per-IP /auth throttle must stay at its strict
+  // production default (5). A non-default value is a test-only override (the
+  // Playwright e2e raises it) and must NEVER ship to production. Because
+  // `.default(5)` makes an omitted value and an explicit `5` indistinguishable
+  // (both resolve to 5 — the accepted default), any parsed value OTHER than 5
+  // is necessarily an explicit non-default override; reject it in production.
+  if (e.NODE_ENV === 'production' && e.AUTH_THROTTLE_LIMIT !== 5) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_THROTTLE_LIMIT'],
+      message:
+        'AUTH_THROTTLE_LIMIT must not be overridden in production — it is fixed at the default 5.',
     });
   }
 });
