@@ -1,4 +1,35 @@
 {
+  "staffTriage": {
+    "listTitle": "Issues",
+    "listSubtitle": "All issues in your scope, with their current status.",
+    "loadFailed": "Could not load issues.",
+    "emptyTitle": "No issues to triage",
+    "emptyDescription": "Issues in your scope will appear here.",
+    "createdOnLabel": "Reported on {date}",
+    "detailTitle": "Issue details",
+    "descriptionLabel": "Description",
+    "createdAtLabel": "Reported on",
+    "notFoundTitle": "Issue not found",
+    "notFoundDescription": "This issue doesn't exist, or you don't have access to it.",
+    "attachmentLabel": "Attached photo",
+    "attachmentAlt": "Photo attached to this issue",
+    "downloadAttachment": "Download attachment",
+    "timelineTitle": "Status history",
+    "timelineEmpty": "No updates yet.",
+    "timelineSystemActor": "—",
+    "transitionTitle": "Update status",
+    "transitionTargetLabel": "Next status",
+    "transitionNoteLabel": "Note (required)",
+    "transitionNoteHint": "Explain this update for the record. Up to 1000 characters.",
+    "transitionSubmit": "Update status",
+    "transitionSubmitting": "Updating…",
+    "transitionNone": "No further action is available for this issue.",
+    "transitionStaleStatus": "This issue was already updated by someone else. Reload to see the latest status.",
+    "transitionInvalid": "This update isn't allowed from the issue's current status.",
+    "transitionGenericError": "Could not update the status. Please try again.",
+    "noticeTitle": "Temporary screen",
+    "noticeBody": "This is an interim web screen for staff triage. The long-term home for this workflow is the shared mobile app with role switching."
+  },
   "common": {
     "appName": "Panchayat Grievance Platform",
     "submit": "Submit",
@@ -63,6 +94,35 @@
     "emptyDescription": "Issues you report will appear here with their status.",
     "reportCta": "Report an issue"
   },
+  "report": {
+    "title": "Report an issue",
+    "subtitle": "Tell us what's wrong and where. We'll give you a reference number to track it.",
+    "categoryLabel": "Category",
+    "categoryPlaceholder": "Select a category",
+    "categoryRequired": "Please select a category.",
+    "subcategoryLabel": "Subcategory (optional)",
+    "subcategoryPlaceholder": "Select a subcategory",
+    "panchayatLabel": "Panchayat",
+    "panchayatPlaceholder": "Select a panchayat",
+    "panchayatRequired": "Please select a panchayat.",
+    "wardLabel": "Ward",
+    "wardPlaceholder": "Select a ward",
+    "wardRequired": "Please select a ward.",
+    "titleLabel": "Title",
+    "titleRequired": "Please enter a short title.",
+    "descriptionLabel": "Description",
+    "descriptionRequired": "Please describe the issue.",
+    "photoLabel": "Photo (optional)",
+    "photoHint": "You can attach a JPEG, PNG or WebP image.",
+    "reviewHeading": "Review before submitting",
+    "reviewEmpty": "No title entered yet.",
+    "submitCta": "Submit grievance",
+    "submitFailed": "Could not submit your grievance. Please try again.",
+    "confirmTitle": "Grievance submitted",
+    "confirmDescription": "Keep this reference number to track your grievance.",
+    "referenceNumberLabel": "Your reference number",
+    "photoUploadFailed": "Your grievance was submitted, but the photo could not be uploaded."
+  },
   "profile": {
     "title": "Your profile",
     "subtitle": "Keep your details up to date.",
@@ -74,13 +134,47 @@
   "notifications": {
     "title": "Notifications",
     "emptyTitle": "No notifications yet",
-    "emptyDescription": "We'll let you know here when there's an update on your issues."
+    "emptyDescription": "We'll let you know here when there's an update on your issues.",
+    "loadFailed": "Could not load your notifications.",
+    "bellLabel": "Notifications, {count} unread",
+    "unreadLabel": "Unread",
+    "readLabel": "Read",
+    "message": {
+      "issueSubmitted": "Your issue has been submitted.",
+      "issueStatusChanged": "There's a status update on your issue.",
+      "unknown": "You have a new notification."
+    }
+  },
+  "issues": {
+    "dashboardTitle": "Your issues",
+    "dashboardSubtitle": "Everything you've reported, with its latest status.",
+    "loadFailed": "Could not load your issues.",
+    "emptyTitle": "No issues reported yet",
+    "emptyDescription": "Issues you report will appear here with their status.",
+    "reportCta": "Report an issue",
+    "referenceLabel": "Reference",
+    "createdOnLabel": "Reported on {date}",
+    "createdAtLabel": "Reported on",
+    "detailTitle": "Issue details",
+    "categoryLabel": "Category",
+    "locationLabel": "Location",
+    "descriptionLabel": "Description",
+    "attachmentLabel": "Attached photo",
+    "attachmentAlt": "Photo attached to this issue",
+    "downloadAttachment": "Download attachment",
+    "notFoundTitle": "Issue not found",
+    "notFoundDescription": "This issue doesn't exist, or you don't have access to it.",
+    "backToDashboard": "Back to your issues",
+    "timelineTitle": "Status history",
+    "timelineEmpty": "No updates yet.",
+    "timelineFromTo": "{from} → {to}",
+    "timelineSystemActor": "—"
   },
   "bottomNav": {
     "navLabel": "Primary",
     "home": "Home",
     "report": "Report",
-    "track": "Track",
+    "issues": "Issues",
     "profile": "Profile"
   },
   "languageSwitcher": {
@@ -161,6 +255,10 @@
     "landAndEncroachment": "Land and encroachment",
     "publicSafety": "Public safety",
     "other": "Other"
+  },
+  "errors": {
+    "issueNotFound": "This issue doesn't exist, or you don't have access to it.",
+    "generic": "Something went wrong. Please try again."
   },
   "admin": {
     "loginTitle": "Staff sign in",

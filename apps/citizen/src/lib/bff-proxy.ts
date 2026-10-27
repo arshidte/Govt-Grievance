@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { isPathSafe } from './bff-allowlist';
+
 /**
  * Shared BFF (backend-for-frontend) relay helper.
  *
@@ -34,6 +36,25 @@ function upstreamUrl(pathSegments: string[], search: string): string {
  * string.
  */
 export async function proxyToApi(request: NextRequest, pathSegments: string[]): Promise<NextResponse> {
+  // PATH-SAFETY GATE (Task 18) — runs BEFORE the upstream URL is built or
+  // fetched, so a crafted traversal / absolute-URL / host-override can never
+  // reach `fetch`. Lives HERE (not in the per-route allowlist) precisely so
+  // BOTH callers are protected: the general `/api/v1/[...path]` catch-all
+  // AND the `/api/v1/auth/[...action]` sibling route — the auth route also
+  // string-concats its segments into `proxyToApi`, so without this guard a
+  // request like `/api/v1/auth/%2e%2e/dev/last-otp` (delivered decoded as
+  // `['auth','..','dev','last-otp']`) would let `fetch`'s URL normalization
+  // collapse `/auth/../dev/` → `/dev/`, escaping the `auth/` prefix. We
+  // reject any `.`/`..` (raw or `%2e`-encoded), leading/embedded `/`, `\`,
+  // `//`, or `scheme:`/`scheme://` form. Rejection → 404, upstream NEVER
+  // called, indistinguishable from a nonexistent route.
+  if (!isPathSafe(pathSegments)) {
+    return NextResponse.json(
+      { error: { code: 'not_found', messageKey: 'errors.notFound' } },
+      { status: 404 },
+    );
+  }
+
   const url = upstreamUrl(pathSegments, request.nextUrl.search);
 
   const headers = new Headers();

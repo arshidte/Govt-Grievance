@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { Response } from 'express';
 
@@ -37,6 +38,38 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof ApiError) {
       this.logger.warn(`ApiError: ${exception.code} (${exception.status}) ${exception.message}`);
       response.status(exception.status).json(this.body(exception.code, exception.messageKey));
+      return;
+    }
+
+    // ADDITIVE (Task 16), placed BEFORE the generic `HttpException` branch
+    // below so it does not change that branch's behavior for anything else.
+    //
+    // Multer's own oversize rejection. With the upload route's
+    // `FileInterceptor` configured with a `limits.fileSize`, a file whose
+    // body EXCEEDS that limit makes Multer throw a `MulterError` with
+    // `code: 'LIMIT_FILE_SIZE'` DURING interceptor processing — i.e. before
+    // the controller handler (and before `AttachmentsService`'s own ≤5MB
+    // check) ever runs. That is the desired "reject before buffering the
+    // whole body" behavior (spec §10).
+    //
+    // IMPORTANT (discovered while wiring this up, not assumed from the
+    // brief): `@nestjs/platform-express`'s multer interceptor does NOT let
+    // the raw `MulterError` propagate — its internal `transformException`
+    // (see `multer.utils.js`) already converts `LIMIT_FILE_SIZE` into a
+    // Nest `PayloadTooLargeException` (a normal `HttpException`, status
+    // 413) before this filter ever runs. So the generic `HttpException`
+    // branch WOULD already produce a 413 for it — but with a generic,
+    // Nest-derived body (`{ code: 'payload_too_large', messageKey:
+    // 'states.error' }`), not the service's own `file_too_large` /
+    // `errors.fileTooLarge` pair. The brief's requirement is that the two
+    // 413 paths (Multer-rejected vs. service-rejected) be INDISTINGUISHABLE
+    // to clients, so we special-case `PayloadTooLargeException` here to
+    // normalize its body to match the service's, while leaving every other
+    // `HttpException` subtype to fall through to the untouched generic
+    // branch below.
+    if (exception instanceof PayloadTooLargeException) {
+      this.logger.warn(`PayloadTooLargeException (Multer LIMIT_FILE_SIZE): ${exception.message}`);
+      response.status(413).json(this.body('file_too_large', 'errors.fileTooLarge'));
       return;
     }
 

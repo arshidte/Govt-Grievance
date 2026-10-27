@@ -24,24 +24,53 @@ enum Language {
   ml
 }
 
+// Canonical grievance/issue lifecycle statuses (mirrors @pg/types
+// IssueStatusEnum — the single source of truth). M2 activates only
+// SUBMITTED/ACKNOWLEDGED/IN_PROGRESS/RESOLVED via the transition
+// validator; the remaining values are defined but dormant until a later
+// milestone.
+enum IssueStatus {
+  SUBMITTED
+  ACKNOWLEDGED
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_INFORMATION
+  ESCALATED
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+// Canonical grievance priority levels (mirrors @pg/types PriorityEnum).
+// M2 fixes every issue's priority at MEDIUM (no client/staff editing).
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model User {
-  id                String     @id @default(cuid())
-  phone             String     @unique
-  email             String?
-  fullName          String?
-  preferredLanguage Language   @default(en)
-  status            UserStatus @default(active)
-  addressLine       String?
-  wardId            String?
-  ward              Ward?      @relation(fields: [wardId], references: [id])
-  roleAssignments   RoleAssignment[]
-  sessions          Session[]
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id                  String               @id @default(cuid())
+  phone               String               @unique
+  email               String?
+  fullName            String?
+  preferredLanguage   Language             @default(en)
+  status              UserStatus           @default(active)
+  addressLine         String?
+  wardId              String?
+  ward                Ward?                @relation(fields: [wardId], references: [id])
+  roleAssignments     RoleAssignment[]
+  sessions            Session[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   // issue-domain back-relations (M2):
-  issuesAsCitizen   Issue[]        @relation("issueCitizen")
-  issuesCreated     Issue[]        @relation("issueCreatedBy")
-  notifications     Notification[]
+  issuesAsCitizen     Issue[]              @relation("issueCitizen")
+  issuesCreated       Issue[]              @relation("issueCreatedBy")
+  notifications       Notification[]
+  statusChanges       IssueStatusHistory[] @relation("statusHistoryChangedBy")
+  attachmentsUploaded Attachment[]         @relation("attachmentUploadedBy")
 }
 
 model OtpChallenge {
@@ -92,28 +121,28 @@ model RoleAssignment {
 }
 
 model Panchayat {
-  id              String   @id @default(cuid())
-  code            String   @unique
+  id              String           @id @default(cuid())
+  code            String           @unique
   name            String
   nameMl          String
   contactPhone    String?
   contactEmail    String?
-  status          String   @default("active")
+  status          String           @default("active")
   wards           Ward[]
   roleAssignments RoleAssignment[]
   issues          Issue[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 }
 
 model Ward {
-  id              String   @id @default(cuid())
+  id              String           @id @default(cuid())
   number          Int
   name            String
   nameMl          String
   panchayatId     String
-  panchayat       Panchayat @relation(fields: [panchayatId], references: [id])
-  status          String    @default("active")
+  panchayat       Panchayat        @relation(fields: [panchayatId], references: [id])
+  status          String           @default("active")
   roleAssignments RoleAssignment[]
   users           User[]
   issues          Issue[]
@@ -122,11 +151,11 @@ model Ward {
 }
 
 model Category {
-  id            String   @id @default(cuid())
-  slug          String   @unique
+  id            String        @id @default(cuid())
+  slug          String        @unique
   name          String
   nameMl        String
-  sortOrder     Int      @default(0)
+  sortOrder     Int           @default(0)
   subcategories Subcategory[]
   issues        Issue[]
 }
@@ -137,24 +166,32 @@ model Subcategory {
   category   Category @relation(fields: [categoryId], references: [id])
   name       String
   nameMl     String
+  issues     Issue[]
 }
 
-// ---- Issue domain: relationships fixed now, fields in M2 ----
+// ---- Issue domain ----
 model Issue {
-  id            String   @id @default(cuid())
-  referenceNo   String   @unique
+  id            String               @id @default(cuid())
+  referenceNo   String               @unique
+  title         String
+  description   String
+  status        IssueStatus          @default(SUBMITTED)
+  priority      Priority             @default(MEDIUM)
   citizenId     String
-  citizen       User     @relation("issueCitizen", fields: [citizenId], references: [id])
+  citizen       User                 @relation("issueCitizen", fields: [citizenId], references: [id])
   createdById   String
-  createdBy     User     @relation("issueCreatedBy", fields: [createdById], references: [id])
-  onBehalfOf    Boolean  @default(false)
+  createdBy     User                 @relation("issueCreatedBy", fields: [createdById], references: [id])
+  onBehalfOf    Boolean              @default(false)
   panchayatId   String
-  panchayat     Panchayat @relation(fields: [panchayatId], references: [id])
+  panchayat     Panchayat            @relation(fields: [panchayatId], references: [id])
   wardId        String
-  ward          Ward     @relation(fields: [wardId], references: [id])
+  ward          Ward                 @relation(fields: [wardId], references: [id])
   categoryId    String
-  category      Category @relation(fields: [categoryId], references: [id])
-  createdAt     DateTime @default(now())
+  category      Category             @relation(fields: [categoryId], references: [id])
+  subcategoryId String?
+  subcategory   Subcategory?         @relation(fields: [subcategoryId], references: [id])
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   assignments   IssueAssignment[]
   statusHistory IssueStatusHistory[]
   escalations   Escalation[]
@@ -171,11 +208,19 @@ model IssueAssignment {
 }
 
 model IssueStatusHistory {
-  id        String   @id @default(cuid())
-  issueId   String
-  issue     Issue    @relation(fields: [issueId], references: [id])
-  status    String
-  createdAt DateTime @default(now())
+  id           String        @id @default(cuid())
+  issueId      String
+  issue        Issue         @relation(fields: [issueId], references: [id])
+  // Nullable by design: legacy/backfilled rows (pre-M2) have no recorded
+  // actor and must not be given an invented one — see spec §4.5. M2
+  // application logic always populates this for newly-created rows.
+  changedById  String?
+  changedBy    User?         @relation("statusHistoryChangedBy", fields: [changedById], references: [id])
+  fromStatus   IssueStatus
+  toStatus     IssueStatus
+  note         String?
+  createdAt    DateTime      @default(now())
+  notification Notification?
 }
 
 model Escalation {
@@ -186,22 +231,47 @@ model Escalation {
 }
 
 model Attachment {
-  id         String   @id @default(cuid())
-  issueId    String
-  issue      Issue    @relation(fields: [issueId], references: [id])
-  storageKey String
-  createdAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  issueId      String
+  issue        Issue    @relation(fields: [issueId], references: [id])
+  uploadedById String
+  uploadedBy   User     @relation("attachmentUploadedBy", fields: [uploadedById], references: [id])
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  originalName String
+  createdAt    DateTime @default(now())
 }
 
 model Notification {
-  id          String    @id @default(cuid())
-  recipientId String
-  recipient   User      @relation(fields: [recipientId], references: [id])
-  issueId     String?
-  issue       Issue?    @relation(fields: [issueId], references: [id])
-  type        String
-  readAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id              String              @id @default(cuid())
+  recipientId     String
+  recipient       User                @relation(fields: [recipientId], references: [id])
+  issueId         String?
+  issue           Issue?              @relation(fields: [issueId], references: [id])
+  type            String
+  statusHistoryId String?             @unique
+  statusHistory   IssueStatusHistory? @relation(fields: [statusHistoryId], references: [id])
+  readAt          DateTime?
+  createdAt       DateTime            @default(now())
+}
+
+// Creation-idempotency replay store (M2 Task 6). Standalone/no relations by
+// design: a userId that no longer resolves to a User must not block replay
+// lookups, and this table's lifecycle (24h TTL purge, Task 9) is intentionally
+// decoupled from User/Issue cascade behaviour.
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  key          String
+  userId       String
+  route        String
+  fingerprint  String
+  responseJson Json
+  issueId      String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, route, key])
+  @@index([createdAt])
 }
 
 model AuditLog {

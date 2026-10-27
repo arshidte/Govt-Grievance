@@ -1,24 +1,15 @@
 import { statusLabelKey } from '@pg/i18n';
+import type { IssueStatus } from '@pg/types';
 import * as React from 'react';
 import { cn } from '../lib/cn';
 
 /**
  * The 10 canonical grievance statuses (UPPER_SNAKE, as stored/transmitted).
- * Kept local (not imported from @pg/types) since no shared `Status` enum
- * exists yet there — @pg/i18n's STATUS_KEY map is the parallel source of
- * truth for the UPPER_SNAKE -> message-key mapping.
+ * Re-exported here (rather than requiring every consumer to import from
+ * @pg/types directly) so existing `Status`-typed call sites keep working
+ * unchanged; @pg/types is now the single source of truth for the member set.
  */
-export type Status =
-  | 'SUBMITTED'
-  | 'ACKNOWLEDGED'
-  | 'UNDER_REVIEW'
-  | 'ASSIGNED'
-  | 'IN_PROGRESS'
-  | 'WAITING_FOR_INFORMATION'
-  | 'ESCALATED'
-  | 'RESOLVED'
-  | 'CLOSED'
-  | 'REOPENED';
+export type Status = IssueStatus;
 
 export interface StatusBadgeProps {
   status: Status;
@@ -171,7 +162,14 @@ const colorClasses: Record<string, string> = {
  * through @pg/i18n's `statusLabelKey`, never hardcoding English strings.
  */
 export function StatusBadge({ status, t, className }: StatusBadgeProps) {
-  const { tokenKey, Icon } = STATUS_DESCRIPTORS[status];
+  // `status` is typed as the exhaustive `Status` union, but the VALUE at
+  // runtime originates from an API response (not re-validated client-side),
+  // so an unrecognized string can still arrive (e.g. a future status added
+  // server-side before the client ships support for it). Fall back to the
+  // SUBMITTED descriptor in that case — same fallback `statusLabelKey`
+  // already applies to the label — rather than letting an unguarded lookup
+  // throw and crash the page.
+  const { tokenKey, Icon } = STATUS_DESCRIPTORS[status] ?? STATUS_DESCRIPTORS.SUBMITTED;
   const label = t(statusLabelKey(status));
 
   return (

@@ -1,4 +1,6 @@
-import type { NextResponse, NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
+
+import { isAllowed } from '../../../../lib/bff-allowlist';
 import { proxyToApi } from '../../../../lib/bff-proxy';
 
 /**
@@ -20,12 +22,43 @@ import { proxyToApi } from '../../../../lib/bff-proxy';
  * of API-side guards (`PATCH /users/me` still requires `AuthGuard` on the
  * NestJS side; this proxy forwards the Cookie header but adds no
  * authorization logic of its own).
+ *
+ * TASK 18 (BFF HARDENING): this catch-all is no longer a forward-everything
+ * relay. It FIRST consults the citizen `isAllowed(method, path)` allowlist
+ * (`src/lib/bff-allowlist.ts`); any (method, path) pair the citizen screens
+ * don't use — staff-only routes (`PATCH issues/:id/status`,
+ * `POST issues/on-behalf`), dev routes (`GET dev/last-otp`), or anything
+ * unlisted — is rejected as a 404 BEFORE `proxyToApi`/`fetch` is ever
+ * called, indistinguishable from a nonexistent route (no hint it was a
+ * blocked internal path). Traversal / absolute-URL safety is enforced one
+ * layer deeper, inside `proxyToApi` (so the auth sibling route gets it too).
  */
+
+/**
+ * 404 in the SAME uniform error-body shape the NestJS API uses
+ * (`{ error: { code, messageKey } }`) so a blocked path is indistinguishable
+ * from a genuinely nonexistent one — no signal that it was an allowlist
+ * rejection of a real internal endpoint.
+ */
+function notFound(): NextResponse {
+  return NextResponse.json(
+    { error: { code: 'not_found', messageKey: 'errors.notFound' } },
+    { status: 404 },
+  );
+}
+
 async function handler(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ): Promise<NextResponse> {
   const { path } = await params;
+
+  // Allowlist gate — reject disallowed (method, path) pairs BEFORE any
+  // upstream contact. `proxyToApi` is never reached for a 404 here.
+  if (!isAllowed(request.method, path)) {
+    return notFound();
+  }
+
   return proxyToApi(request, path);
 }
 

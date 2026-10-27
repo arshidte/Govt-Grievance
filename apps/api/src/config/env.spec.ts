@@ -52,4 +52,41 @@ describe('loadEnv', () => {
     const result = loadEnv({ DATABASE_URL: DB, NODE_ENV: 'development', SMS_PROVIDER: 'mock' });
     expect(result.SMS_PROVIDER).toBe('mock');
   });
+
+  describe('AUTH_THROTTLE_LIMIT', () => {
+    it('defaults to 5 when omitted', () => {
+      expect(loadEnv({ DATABASE_URL: DB }).AUTH_THROTTLE_LIMIT).toBe(5);
+    });
+
+    it('accepts a positive-integer override outside production (coerced from string)', () => {
+      const result = loadEnv({ DATABASE_URL: DB, NODE_ENV: 'development', AUTH_THROTTLE_LIMIT: '1000' });
+      expect(result.AUTH_THROTTLE_LIMIT).toBe(1000);
+    });
+
+    it.each(['0', '-1', '1.5', 'abc', ''])('rejects invalid value %p', (value) => {
+      expect(() => loadEnv({ DATABASE_URL: DB, AUTH_THROTTLE_LIMIT: value })).toThrow();
+    });
+
+    it('fails closed: rejects a non-default override in production', () => {
+      // SMS_PROVIDER set to a real value so this isolates the throttle guard
+      // (production independently rejects the default mock provider).
+      expect(() =>
+        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'twilio', AUTH_THROTTLE_LIMIT: '1000' }),
+      ).toThrow(/AUTH_THROTTLE_LIMIT must not be overridden/);
+    });
+
+    it('allows the default (5) in production whether omitted or set explicitly', () => {
+      expect(
+        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'twilio' }).AUTH_THROTTLE_LIMIT,
+      ).toBe(5);
+      expect(
+        loadEnv({
+          DATABASE_URL: DB,
+          NODE_ENV: 'production',
+          SMS_PROVIDER: 'twilio',
+          AUTH_THROTTLE_LIMIT: '5',
+        }).AUTH_THROTTLE_LIMIT,
+      ).toBe(5);
+    });
+  });
 });

@@ -28,8 +28,17 @@ function devPhone(): string {
   return `+919${tail}`;
 }
 
+/**
+ * API origin (the Playwright webServer boots it on :4000). The dev-only OTP
+ * endpoint lives on the API itself and MUST be read from here directly: the
+ * citizen BFF's hardened allowlist (Task 18 — see
+ * `apps/citizen/src/lib/bff-allowlist.ts`) does not forward `dev/*`, so
+ * reading it via the citizen app's own origin (`baseURL`, :3000) 404s.
+ */
+const API_BASE = 'http://localhost:4000';
+
 test.describe('citizen auth', () => {
-  test('visit / -> login -> verify via dev OTP -> lands on /home', async ({ page, baseURL }) => {
+  test('visit / -> login -> verify via dev OTP -> lands on /home', async ({ page }) => {
     const phone = devPhone();
 
     await page.goto('/');
@@ -44,7 +53,7 @@ test.describe('citizen auth', () => {
     // this task. Guarded server-side to 404 outside non-production — see
     // apps/api/src/dev/dev.controller.ts.
     const lastOtpResponse = await page.request.get(
-      `${baseURL}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
+      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
     );
     expect(lastOtpResponse.ok()).toBe(true);
     const { code } = (await lastOtpResponse.json()) as { code: string };
