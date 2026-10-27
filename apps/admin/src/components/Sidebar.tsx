@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import type { MeResponse } from '@pg/types';
 import { can, type CanUser } from '../features/auth/can';
+import { LogoutButton } from '../features/auth/LogoutButton';
 import { navItems } from '../features/nav/navItems';
 
 export interface SidebarProps {
@@ -81,6 +82,12 @@ export function NavLinks({ roles, onNavigate }: SidebarProps & { onNavigate?: ()
  * between the two presentations). A plain `<nav>` landmark with an
  * accessible label; active route exposed via `aria-current="page"`
  * (WCAG 1.4.1 — never color alone).
+ *
+ * `LogoutButton` is a separate action, not a nav item, so it is NOT part
+ * of `navItems`/`can()` filtering — it is rendered after `NavLinks` and
+ * pushed to the bottom of the sidebar chrome via `mt-auto` on its
+ * wrapper, independent of how many nav items are visible for the current
+ * role.
  */
 export function Sidebar({ roles }: SidebarProps) {
   const t = useTranslations('common');
@@ -92,6 +99,10 @@ export function Sidebar({ roles }: SidebarProps) {
       className="hidden w-64 shrink-0 flex-col gap-1 border-r border-neutral-200 bg-white p-4 lg:flex"
     >
       <NavLinks roles={roles} />
+
+      <div className="mt-auto">
+        <LogoutButton />
+      </div>
     </nav>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { MeResponse } from '@pg/types';
+import { LogoutButton } from '../features/auth/LogoutButton';
 import { NavLinks, type SidebarProps } from './Sidebar';
 
 function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -39,6 +40,14 @@ function CloseIcon(props: React.SVGProps<SVGSVGElement>) {
  *    immediately reachable rather than hidden behind the open overlay).
  *  - The overlay is `aria-hidden` and purely a click-to-close target; it
  *    carries no interactive semantics of its own.
+ *
+ * `LogoutButton` is rendered at the bottom of the drawer panel (after
+ * `NavLinks`, pushed down via `mt-auto` — same placement as the desktop
+ * `Sidebar`). It is a plain render, not wired into the drawer's own
+ * open/close state: logging out navigates to `/login` on success anyway,
+ * which unmounts this drawer along with everything else, so there is no
+ * need to also call `close()` first — doing so would just add a redundant
+ * state flip with no visible effect before the navigation happens.
  */
 export function MobileDrawer({ roles }: SidebarProps & { roles: MeResponse['roles'] }) {
   const t = useTranslations('common');
@@ -114,6 +123,10 @@ export function MobileDrawer({ roles }: SidebarProps & { roles: MeResponse['role
               </button>
             </div>
             <NavLinks roles={roles} onNavigate={close} />
+
+            <div className="mt-auto">
+              <LogoutButton />
+            </div>
           </div>
         </>
       )}
