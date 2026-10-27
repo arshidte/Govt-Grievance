@@ -78,7 +78,13 @@ export default defineConfig({
         // would otherwise trip the default 5/hour limit (incidental coupling,
         // not the behavior under test here — the limit itself is asserted by
         // the api suite's otp.service.spec + throttle.e2e-spec).
-        'OTP_RATE_LIMIT_PER_PHONE_PER_HOUR=100 node apps/api/dist/main.js',
+        // Also raise the per-IP /auth/* throttle for the e2e API only: this
+        // cross-app suite performs many real OTP logins (admin-auth +
+        // coordinator + rep + citizen) from one IP, which would otherwise
+        // trip the strict default (5/60s). The throttle's actual behaviour is
+        // asserted by the api `throttle.e2e-spec` at the default; this
+        // override mirrors the OTP_RATE_LIMIT override beside it.
+        'OTP_RATE_LIMIT_PER_PHONE_PER_HOUR=100 AUTH_THROTTLE_LIMIT=1000 node apps/api/dist/main.js',
       cwd: '../..',
       url: `http://localhost:${API_PORT}/api/v1/health`,
       reuseExistingServer: !process.env.CI,

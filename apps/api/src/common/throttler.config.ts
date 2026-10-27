@@ -26,8 +26,19 @@ export const DEFAULT_THROTTLE_TTL_MS = 60_000;
  * `AUTH_THROTTLE_TTL_MS` window, per IP. Deliberately much lower than the
  * default limit (acceptance criterion: auth endpoints throttled harder than
  * general endpoints).
+ *
+ * The PRODUCTION default is `5` (strict) — and `test/throttle.e2e-spec.ts`
+ * asserts exactly this behaviour against the default (it never sets the env
+ * var below). It is env-OVERRIDABLE solely so the Playwright BROWSER e2e
+ * harness can raise it (its `webServer` boots the API with a high value,
+ * alongside the existing `OTP_RATE_LIMIT_PER_PHONE_PER_HOUR=100` override):
+ * those suites legitimately perform many real OTP logins from a single IP
+ * (127.0.0.1), which is a harness artifact, NOT the abuse this throttle
+ * guards against — the throttle's real behaviour is covered by the dedicated
+ * throttle e2e at the default. Never lower the default; never set the
+ * override in a production environment.
  */
-export const AUTH_THROTTLE_LIMIT = 5;
+export const AUTH_THROTTLE_LIMIT = Number(process.env.AUTH_THROTTLE_LIMIT ?? 5);
 
 /** Window (ms) for the tight auth limit. */
 export const AUTH_THROTTLE_TTL_MS = 60_000;
