@@ -60,7 +60,15 @@ export function useIssue(client: ApiClient, id: string): UseQueryResult<IssueDet
   });
 }
 
-/** Mutation: `POST /issues`. Invalidates `queryKeys.issues` (the list) on success. */
+/**
+ * Mutation: `POST /issues`. On success invalidates the issues list AND the
+ * notification queries: a submission also writes the citizen's
+ * `issue.submitted` notification server-side (see API §11), so the shell's
+ * unread-count bell + notifications list must refetch to reflect it —
+ * otherwise the bell stays stale at its mount-time value (0) until a hard
+ * reload. (`queryKeys.notifications` is the prefix of `queryKeys.unreadCount`,
+ * so both are invalidated explicitly to be unambiguous.)
+ */
 export function useCreateIssue(
   client: ApiClient,
 ): UseMutationResult<IssueDetailDTO, Error, CreateIssueVariables> {
@@ -70,11 +78,20 @@ export function useCreateIssue(
       client.createIssue(input, idempotencyKey),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.issues });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
     },
   });
 }
 
-/** Mutation: `POST /issues/on-behalf`. Invalidates `queryKeys.issues` (the list) on success. */
+/**
+ * Mutation: `POST /issues/on-behalf`. On success invalidates the issues list
+ * plus the notification queries — like a self-submission, an on-behalf
+ * creation writes the resolved CITIZEN's `issue.submitted` notification, so a
+ * client observing notifications must refetch. (The notification recipient is
+ * the citizen, not the acting rep; the invalidation is harmless on the rep's
+ * own client and correct for any shared cache.)
+ */
 export function useCreateOnBehalf(
   client: ApiClient,
 ): UseMutationResult<OnBehalfResult, Error, CreateOnBehalfVariables> {
@@ -84,6 +101,8 @@ export function useCreateOnBehalf(
       client.createOnBehalf(input, idempotencyKey),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.issues });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
     },
   });
 }
