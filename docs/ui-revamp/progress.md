@@ -16,7 +16,8 @@ Decisions: subagent-driven phase-by-phase; Citizen = responsive desktop sidebar 
 - [ ] Landing `/`  - [ ] /login  - [ ] /verify  - [ ] /register  - [ ] /track
 - [x] P3-auth DONE (5de7beb): landing/login/verify/register/track → shared AuthShell; all testids + Digit-N/Full-name/Save-and-continue preserved; no new i18n; 89 tests + parity + build green.
 - [x] P3-core DONE: /home (PageHeader greeting + StatCards with REAL useIssues-derived counts [total/submitted/in-progress/resolved] + recent-grievance preview + Submit CTA; empty-state when none), /issues (PageHeader + Submit action, restyled IssueCards, Loading/Error/Empty states — card testids kept), /issues/[id] (PageHeader ref+StatusBadge+back link, metadata Card, same-origin attachment, rail-and-dot Timeline Card). All testids + no-PII timeline + non-disclosing 404 intact. Added home.* / issues.submitCta i18n (en+ml). citizen 90 tests, i18n parity, tsc, eslint (0 err), build all green. home-overview.test rewritten for real-count behavior (justified).
-- [ ] /report (wizard)  - [ ] /notifications  - [ ] /profile (+logout)
+- [x] P3-core DONE (e04930d): home real counts + dashboard + detail/timeline. home-overview wraps home-empty-state (both visible when empty — Playwright-safe).
+- [x] P3-forms DONE (77a4c98): wizard + notifications + profile. All testids + wizard flow/idempotency/validation + unread cue preserved. 90 citizen tests, parity, build green. --- CITIZEN APP COMPLETE (Phase 3) ---
 
 ## Phase 4 — Admin (6 functional + 10 placeholders + shell)
 - [ ] Shell: sidebar + drawer + top bar refresh
