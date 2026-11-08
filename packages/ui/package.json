@@ -18,6 +18,7 @@
     "@pg/types": "workspace:*",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-toast": "^1.2.24",
+    "lucide-react": "^0.456.0",
     "tailwindcss": "^3.4.0"
   },
   "peerDependencies": {

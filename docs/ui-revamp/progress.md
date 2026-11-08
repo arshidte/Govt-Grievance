@@ -6,8 +6,9 @@ Decisions: subagent-driven phase-by-phase; Citizen = responsive desktop sidebar 
 ## Rule per unit: restyle only (keep component public APIs, exports, data-testids, routes, behavior). All new strings → en+ml. Run app tests + build green before marking done.
 
 ## Phase 2 — Design foundation
-- [ ] P2a: token refinement + restyle existing @pg/ui primitives (Button, Input, OtpInput, Card, Alert, StatusBadge, PriorityBadge, EmptyState, LoadingState, ErrorState, ForbiddenState, Skeleton, Toast) — keep APIs/testids/tests green.
-- [ ] P2b: new shared components (PageHeader, StatCard, Table[responsive→cards], SidebarNav/NavItem, Avatar, SearchInput/Select, Tabs, Dialog as needed) + iconography.
+- [x] P2a DONE (commit 3bb5792): added additive `surface` token alias; restyled 12 primitives (Button/Input/OtpInput/Card/Alert/StatusBadge/PriorityBadge/EmptyState/ErrorState/ForbiddenState/Toast/Skeleton). NO API/export/testid changes (verified via diff grep). @pg/ui 41, citizen 89, admin 64, both builds, tsc, eslint all green. No test assertions weakened.
+- [x] P2b-1 DONE: layout/nav chrome + iconography — added lucide-react to @pg/ui; new presentational SidebarNav/NavItem, PageHeader, Avatar (testids sidebar-nav/nav-item/page-header/avatar). ADDITIVE only (new files + index.ts exports + package.json). @pg/ui 56 tests (15 new), tsc, eslint (0 err), citizen + admin builds all green.
+- [ ] P2b-2: data/display — StatCard, Table (responsive→cards), SearchInput, Select, Tabs(if needed).
 
 ## Phase 3 — Citizen (11 screens + shell)
 - [ ] Shell: responsive layout (desktop sidebar + top bar; mobile AppHeader+BottomNav/drawer)

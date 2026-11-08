@@ -15,6 +15,9 @@ export * from './components/forbidden-state';
 export * from './components/skeleton';
 export * from './components/toast';
 export * from './components/language-switcher';
+export * from './components/sidebar-nav';
+export * from './components/page-header';
+export * from './components/avatar';
 
 /**
  * TODO(M2): Not built in this milestone — scaffold placeholder only.
