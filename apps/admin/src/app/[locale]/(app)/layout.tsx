@@ -76,14 +76,22 @@ export default async function AuthedLayout({
   const tCommon = await getTranslations({ locale, namespace: 'common' });
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-neutral-50 lg:flex-row">
       <Sidebar roles={me.roles} />
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-neutral-200 bg-white p-4 lg:hidden">
+        {/*
+         * Mobile top bar (below `lg`): the drawer trigger + app brand. The
+         * persistent sidebar owns the desktop chrome, so this bar is
+         * `lg:hidden`. Pages render their own `PageHeader`/`<h1>` title inside
+         * `children`, so the bar stays a thin context strip and does not
+         * duplicate the page title.
+         */}
+        <header className="flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3 lg:hidden">
           <MobileDrawer roles={me.roles} />
           <span className="text-sm font-semibold text-neutral-900">{tCommon('appName')}</span>
         </header>
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        {/* Canvas: neutral-50 page bg with the design-language gutters. */}
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

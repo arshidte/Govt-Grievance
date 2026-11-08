@@ -292,6 +292,12 @@
     "loginSubtitle": "Sign in with your mobile number to access the admin console.",
     "forbiddenTitle": "Access denied",
     "forbiddenDescription": "Your account does not have staff access to the admin console.",
+    "roles": {
+      "admin": "Administrator",
+      "coordinator": "Coordinator",
+      "representative": "Representative",
+      "staff": "Staff"
+    },
     "dashboard": {
       "title": "Dashboard",
       "subtitle": "An overview of activity across your panchayats.",
