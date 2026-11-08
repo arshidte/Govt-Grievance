@@ -18,6 +18,10 @@ export * from './components/language-switcher';
 export * from './components/sidebar-nav';
 export * from './components/page-header';
 export * from './components/avatar';
+export * from './components/stat-card';
+export * from './components/table';
+export * from './components/search-input';
+export * from './components/select';
 
 /**
  * TODO(M2): Not built in this milestone — scaffold placeholder only.
@@ -28,15 +32,16 @@ export * from './components/avatar';
  *   - DatePicker   (M2 — grievance filing date fields)
  *   - FileUploader (M2 — grievance attachment upload)
  *   - FilterPanel  (M2 — citizen/admin list filtering)
- *   - Table        (M2 — admin case list / data table)
  *   - Pagination   (M2 — paginated list views)
  *   - Timeline     (M3 — grievance status history view)
+ *
+ * NOTE: `Table` graduated out of this list in revamp P2b-2 — it now ships as
+ * a presentational component above (`./components/table`).
  */
 export const DEFERRED_COMPONENTS = [
   'DatePicker',
   'FileUploader',
   'FilterPanel',
-  'Table',
   'Pagination',
   'Timeline',
 ] as const;
