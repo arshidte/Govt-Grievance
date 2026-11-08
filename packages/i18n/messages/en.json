@@ -300,13 +300,20 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "subtitle": "An overview of activity across your panchayats.",
-      "openIssues": "Open issues",
-      "escalatedIssues": "Escalated issues",
-      "resolvedThisMonth": "Resolved this month",
-      "pendingCitizens": "Pending registrations",
-      "emptyTitle": "No data yet",
-      "emptyDescription": "Dashboard data arrives in later milestones."
+      "subtitle": "An overview of the grievances in your scope.",
+      "scopeSubtitle": "An overview of the grievances in your scope ({role}).",
+      "statTotal": "In scope",
+      "statSubmitted": "Submitted",
+      "statAcknowledged": "Acknowledged",
+      "statInProgress": "In progress",
+      "statResolved": "Resolved",
+      "viewTriageCta": "Go to triage",
+      "loadFailed": "Could not load your grievances.",
+      "recentTitle": "Recent grievances",
+      "viewAll": "View all",
+      "createdOnLabel": "Reported on {date}",
+      "emptyTitle": "No grievances in your scope yet",
+      "emptyDescription": "Grievances assigned to your scope will appear here."
     },
     "modules": {
       "issuesDescription": "Case management for citizen-reported issues arrives in a later milestone.",
