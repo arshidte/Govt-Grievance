@@ -177,6 +177,15 @@
     "issues": "പരാതികൾ",
     "profile": "പ്രൊഫൈൽ"
   },
+  "sidebar": {
+    "navLabel": "പ്രധാന നാവിഗേഷൻ",
+    "home": "ഹോം",
+    "issues": "എന്റെ പരാതികൾ",
+    "report": "പരാതി സമർപ്പിക്കുക",
+    "notifications": "അറിയിപ്പുകൾ",
+    "profile": "പ്രൊഫൈൽ",
+    "signedInAs": "സൈൻ ഇൻ ചെയ്തു"
+  },
   "languageSwitcher": {
     "label": "ഭാഷ",
     "en": "EN",

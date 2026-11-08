@@ -177,6 +177,15 @@
     "issues": "Issues",
     "profile": "Profile"
   },
+  "sidebar": {
+    "navLabel": "Main navigation",
+    "home": "Home",
+    "issues": "My Grievances",
+    "report": "Submit a Grievance",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "signedInAs": "Signed in"
+  },
   "languageSwitcher": {
     "label": "Language",
     "en": "EN",
