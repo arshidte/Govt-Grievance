@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
@@ -13,12 +13,29 @@ import {
   useUploadAttachment,
   useWards,
 } from '@pg/api-client';
-import { Alert, Button, Input } from '@pg/ui';
+import { Alert, Button, Card, Input } from '@pg/ui';
+import { CheckCircle2, ChevronDown, ImagePlus } from 'lucide-react';
 
 import { useApiClient } from '../auth/api-client';
 
 /** Client-side pre-check only; the server does the authoritative magic-byte sniff + size enforcement. */
 const ACCEPTED_IMAGE_TYPES = 'image/jpeg,image/png,image/webp';
+
+/**
+ * Shared field recipe for the wizard's dependent native `<select>`s. Matched
+ * to the `@pg/ui` `Input`/`Select` recipe (white surface, hairline
+ * neutral-200 border, `rounded-lg`, brand focus ring, 44px min target) so the
+ * form reads as one consistent set of fields. We keep these as plain native
+ * `<select>` elements wired via react-hook-form `register` (NOT the controlled
+ * `@pg/ui` `Select`, which would force a `Controller` refactor) — only the
+ * classes change. `appearance-none` hides the native arrow; `pr-9` leaves room
+ * for the decorative ChevronDown overlay (see `SelectField`).
+ */
+const SELECT_FIELD_CLASS = [
+  'min-h-11 w-full appearance-none rounded-lg border border-neutral-200 bg-white pl-3 pr-9 text-sm text-neutral-900',
+  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
+  'disabled:pointer-events-none disabled:opacity-50',
+].join(' ');
 
 /**
  * Grievance submission wizard (Phase G, spec §12). A clearly-sectioned
@@ -136,15 +153,40 @@ export function SubmitWizard() {
   if (createIssue.isSuccess && createIssue.data) {
     const created = createIssue.data;
     return (
-      <div className="flex flex-col gap-4" data-testid="report-confirmation">
-        <Alert variant="success" title={t('report.confirmTitle')} />
-        <p className="text-sm text-neutral-700">{t('report.confirmDescription')}</p>
-        <p className="text-sm font-medium text-neutral-800">{t('report.referenceNumberLabel')}</p>
-        <p className="text-lg font-semibold text-neutral-900" data-testid="reference-number">
-          {created.referenceNo}
-        </p>
-        {photoWarning && <Alert variant="warning" title={t('report.photoUploadFailed')} />}
-      </div>
+      // Calm, reassuring confirmation: a centered success chip + heading, then
+      // the reference number called out in a tinted panel so it's the clear
+      // focal point. Behavior unchanged — same success condition, same
+      // reference-number + photo-warning surfaces, same testids.
+      <Card className="flex flex-col items-center gap-5 text-center" data-testid="report-confirmation">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-status-resolved">
+          <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
+        </span>
+
+        <div className="flex flex-col gap-1.5">
+          {/* The success Alert carries the role="status" announcement; the
+              heading below is the visible, prominent confirmation copy. */}
+          <Alert variant="success" title={t('report.confirmTitle')} className="justify-center text-left" />
+          <p className="text-sm text-neutral-700">{t('report.confirmDescription')}</p>
+        </div>
+
+        <div className="flex w-full flex-col items-center gap-1 rounded-xl border border-primary-200 bg-primary-50 px-4 py-5">
+          <p className="text-xs font-medium uppercase tracking-wide text-primary-700">
+            {t('report.referenceNumberLabel')}
+          </p>
+          <p
+            className="text-2xl font-semibold tracking-tight text-neutral-900"
+            data-testid="reference-number"
+          >
+            {created.referenceNo}
+          </p>
+        </div>
+
+        <p className="text-sm text-neutral-500">{t('report.confirmNextSteps')}</p>
+
+        {photoWarning && (
+          <Alert variant="warning" title={t('report.photoUploadFailed')} className="w-full text-left" />
+        )}
+      </Card>
     );
   }
 
@@ -160,151 +202,200 @@ export function SubmitWizard() {
   })();
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate data-testid="report-wizard">
-      {/* Category → subcategory (dependent, client-side filter). */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="categoryId" className="text-sm font-medium text-neutral-800">
-          {t('report.categoryLabel')}
-        </label>
-        <select
-          id="categoryId"
-          className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
-          data-testid="category-select"
-          {...register('categoryId', {
-            // Changing the category invalidates any previously-chosen
-            // subcategory (it belonged to the old category).
-            onChange: () => setValue('subcategoryId', undefined),
-          })}
-        >
-          <option value="">{t('report.categoryPlaceholder')}</option>
-          {categories.data?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {displayName(c)}
-            </option>
-          ))}
-        </select>
-        {errors.categoryId && (
-          <p className="text-sm text-status-escalated">{t('report.categoryRequired')}</p>
-        )}
-      </div>
+    <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate data-testid="report-wizard">
+      {/* Section 1 — Location: category → subcategory (dependent, client-side
+          filter) + panchayat → ward (dependent, query gated on panchayat).
+          Grouped into one Card so the "where" context reads as a unit. */}
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-neutral-900">{t('report.sectionLocation')}</h2>
+          <p className="text-sm text-neutral-500">{t('report.sectionLocationHint')}</p>
+        </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="subcategoryId" className="text-sm font-medium text-neutral-800">
-          {t('report.subcategoryLabel')}
-        </label>
-        <select
-          id="subcategoryId"
-          className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
-          data-testid="subcategory-select"
-          disabled={!selectedCategoryId}
-          {...register('subcategoryId')}
-        >
-          <option value="">{t('report.subcategoryPlaceholder')}</option>
-          {subcategories.map((s) => (
-            <option key={s.id} value={s.id}>
-              {displayName(s)}
-            </option>
-          ))}
-        </select>
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="categoryId" className="text-sm font-medium text-neutral-600">
+            {t('report.categoryLabel')}
+          </label>
+          <SelectField>
+            <select
+              id="categoryId"
+              className={SELECT_FIELD_CLASS}
+              aria-invalid={errors.categoryId ? true : undefined}
+              aria-describedby={errors.categoryId ? 'categoryId-error' : undefined}
+              data-testid="category-select"
+              {...register('categoryId', {
+                // Changing the category invalidates any previously-chosen
+                // subcategory (it belonged to the old category).
+                onChange: () => setValue('subcategoryId', undefined),
+              })}
+            >
+              <option value="">{t('report.categoryPlaceholder')}</option>
+              {categories.data?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {displayName(c)}
+                </option>
+              ))}
+            </select>
+          </SelectField>
+          {errors.categoryId && (
+            <p id="categoryId-error" role="alert" className="text-sm text-status-escalated">
+              {t('report.categoryRequired')}
+            </p>
+          )}
+        </div>
 
-      {/* Panchayat → ward (dependent, query gated on panchayat). */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="panchayatId" className="text-sm font-medium text-neutral-800">
-          {t('report.panchayatLabel')}
-        </label>
-        <select
-          id="panchayatId"
-          className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
-          data-testid="panchayat-select"
-          {...register('panchayatId', {
-            // Changing the panchayat resets the chosen ward — the old ward
-            // belonged to a different panchayat and `useWards` refetches.
-            onChange: () => setValue('wardId', ''),
-          })}
-        >
-          <option value="">{t('report.panchayatPlaceholder')}</option>
-          {panchayats.data?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {displayName(p)}
-            </option>
-          ))}
-        </select>
-        {errors.panchayatId && (
-          <p className="text-sm text-status-escalated">{t('report.panchayatRequired')}</p>
-        )}
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="subcategoryId" className="text-sm font-medium text-neutral-600">
+            {t('report.subcategoryLabel')}
+          </label>
+          <SelectField>
+            <select
+              id="subcategoryId"
+              className={SELECT_FIELD_CLASS}
+              data-testid="subcategory-select"
+              disabled={!selectedCategoryId}
+              {...register('subcategoryId')}
+            >
+              <option value="">{t('report.subcategoryPlaceholder')}</option>
+              {subcategories.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {displayName(s)}
+                </option>
+              ))}
+            </select>
+          </SelectField>
+        </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="wardId" className="text-sm font-medium text-neutral-800">
-          {t('report.wardLabel')}
-        </label>
-        <select
-          id="wardId"
-          className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
-          data-testid="ward-select"
-          disabled={!selectedPanchayatId}
-          {...register('wardId')}
-        >
-          <option value="">{t('report.wardPlaceholder')}</option>
-          {wards.data?.map((w) => (
-            <option key={w.id} value={w.id}>
-              {displayName(w)}
-            </option>
-          ))}
-        </select>
-        {errors.wardId && (
-          <p className="text-sm text-status-escalated">{t('report.wardRequired')}</p>
-        )}
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="panchayatId" className="text-sm font-medium text-neutral-600">
+            {t('report.panchayatLabel')}
+          </label>
+          <SelectField>
+            <select
+              id="panchayatId"
+              className={SELECT_FIELD_CLASS}
+              aria-invalid={errors.panchayatId ? true : undefined}
+              aria-describedby={errors.panchayatId ? 'panchayatId-error' : undefined}
+              data-testid="panchayat-select"
+              {...register('panchayatId', {
+                // Changing the panchayat resets the chosen ward — the old ward
+                // belonged to a different panchayat and `useWards` refetches.
+                onChange: () => setValue('wardId', ''),
+              })}
+            >
+              <option value="">{t('report.panchayatPlaceholder')}</option>
+              {panchayats.data?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {displayName(p)}
+                </option>
+              ))}
+            </select>
+          </SelectField>
+          {errors.panchayatId && (
+            <p id="panchayatId-error" role="alert" className="text-sm text-status-escalated">
+              {t('report.panchayatRequired')}
+            </p>
+          )}
+        </div>
 
-      {/* Title + description. */}
-      <Input
-        label={t('report.titleLabel')}
-        error={errors.title?.message ? t('report.titleRequired') : undefined}
-        required
-        data-testid="title-input"
-        {...register('title')}
-      />
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="wardId" className="text-sm font-medium text-neutral-600">
+            {t('report.wardLabel')}
+          </label>
+          <SelectField>
+            <select
+              id="wardId"
+              className={SELECT_FIELD_CLASS}
+              aria-invalid={errors.wardId ? true : undefined}
+              aria-describedby={errors.wardId ? 'wardId-error' : undefined}
+              data-testid="ward-select"
+              disabled={!selectedPanchayatId}
+              {...register('wardId')}
+            >
+              <option value="">{t('report.wardPlaceholder')}</option>
+              {wards.data?.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {displayName(w)}
+                </option>
+              ))}
+            </select>
+          </SelectField>
+          {errors.wardId && (
+            <p id="wardId-error" role="alert" className="text-sm text-status-escalated">
+              {t('report.wardRequired')}
+            </p>
+          )}
+        </div>
+      </Card>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="description" className="text-sm font-medium text-neutral-800">
-          {t('report.descriptionLabel')}
-        </label>
-        <textarea
-          id="description"
-          rows={5}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
-          data-testid="description-input"
-          {...register('description')}
+      {/* Section 2 — Details: title + description + the optional photo. */}
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-neutral-900">{t('report.sectionDetails')}</h2>
+          <p className="text-sm text-neutral-500">{t('report.sectionDetailsHint')}</p>
+        </div>
+
+        <Input
+          label={t('report.titleLabel')}
+          error={errors.title?.message ? t('report.titleRequired') : undefined}
+          required
+          data-testid="title-input"
+          {...register('title')}
         />
-        {errors.description && (
-          <p className="text-sm text-status-escalated">{t('report.descriptionRequired')}</p>
-        )}
-      </div>
 
-      {/* Optional photo. */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="photo" className="text-sm font-medium text-neutral-800">
-          {t('report.photoLabel')}
-        </label>
-        <input
-          id="photo"
-          type="file"
-          accept={ACCEPTED_IMAGE_TYPES}
-          className="text-sm text-neutral-900"
-          data-testid="photo-input"
-          onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-        />
-        <p className="text-xs text-neutral-500">{t('report.photoHint')}</p>
-      </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="description" className="text-sm font-medium text-neutral-600">
+            {t('report.descriptionLabel')}
+          </label>
+          <textarea
+            id="description"
+            rows={5}
+            aria-invalid={errors.description ? true : undefined}
+            aria-describedby={errors.description ? 'description-error' : undefined}
+            className="rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            data-testid="description-input"
+            {...register('description')}
+          />
+          {errors.description && (
+            <p id="description-error" role="alert" className="text-sm text-status-escalated">
+              {t('report.descriptionRequired')}
+            </p>
+          )}
+        </div>
 
-      {/* A single review summary of the entered title before the explicit
-          submit action — a lightweight "review step" within the form. */}
-      <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3" data-testid="review-step">
-        <p className="text-sm font-medium text-neutral-800">{t('report.reviewHeading')}</p>
-        <p className="text-sm text-neutral-600">{watch('title') || t('report.reviewEmpty')}</p>
-      </div>
+        {/* Optional photo — a visible attachment field with its requirements
+            shown. The native file input gets a restyled custom-button recipe
+            via Tailwind's `file:` variant; the hint spells out accepted types. */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="photo" className="text-sm font-medium text-neutral-600">
+            {t('report.photoLabel')}
+          </label>
+          <div className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-200 bg-neutral-50 px-3 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-neutral-400 ring-1 ring-neutral-200">
+              <ImagePlus className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <input
+              id="photo"
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES}
+              className="min-w-0 flex-1 text-sm text-neutral-700 file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border file:border-neutral-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-neutral-900 hover:file:bg-neutral-50"
+              data-testid="photo-input"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          <p className="text-xs text-neutral-500">{t('report.photoHint')}</p>
+        </div>
+      </Card>
+
+      {/* Review step: a lightweight summary of the entered title before the
+          explicit submit action. Rendered as a tinted panel inside its own
+          Card for a clear "check this" cue. */}
+      <Card className="flex flex-col gap-2" data-testid="review-step">
+        <p className="text-sm font-semibold text-neutral-900">{t('report.reviewHeading')}</p>
+        <p className="rounded-lg bg-neutral-50 px-3 py-2.5 text-sm text-neutral-700">
+          {watch('title') || t('report.reviewEmpty')}
+        </p>
+      </Card>
 
       {createErrorMessage && <Alert variant="error" title={createErrorMessage} />}
 
@@ -312,5 +403,26 @@ export function SubmitWizard() {
         {t('report.submitCta')}
       </Button>
     </form>
+  );
+}
+
+/**
+ * Presentational wrapper that overlays a decorative ChevronDown on a native
+ * `<select>` (whose own arrow is hidden via `appearance-none` in
+ * `SELECT_FIELD_CLASS`). The native control still owns all interaction; this
+ * only mirrors the `@pg/ui` Select's chevron affordance for the wizard's
+ * register-wired selects. No logic — just the icon overlay.
+ */
+function SelectField({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative">
+      {children}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-400"
+      >
+        <ChevronDown className="h-4 w-4" />
+      </span>
+    </div>
   );
 }

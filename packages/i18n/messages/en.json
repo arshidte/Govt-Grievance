@@ -123,12 +123,18 @@
     "descriptionRequired": "Please describe the issue.",
     "photoLabel": "Photo (optional)",
     "photoHint": "You can attach a JPEG, PNG or WebP image.",
+    "sectionLocation": "Location",
+    "sectionLocationHint": "Where is the issue? Pick the category and the panchayat and ward it affects.",
+    "sectionDetails": "Details",
+    "sectionDetailsHint": "Give the issue a short title and describe what's wrong.",
+    "sectionPhoto": "Photo",
     "reviewHeading": "Review before submitting",
     "reviewEmpty": "No title entered yet.",
     "submitCta": "Submit grievance",
     "submitFailed": "Could not submit your grievance. Please try again.",
     "confirmTitle": "Grievance submitted",
     "confirmDescription": "Keep this reference number to track your grievance.",
+    "confirmNextSteps": "You can view the status of this grievance any time from the Grievances page.",
     "referenceNumberLabel": "Your reference number",
     "photoUploadFailed": "Your grievance was submitted, but the photo could not be uploaded."
   },
@@ -138,7 +144,9 @@
     "phoneLabel": "Mobile number",
     "saveSuccessTitle": "Profile updated",
     "saveSuccessDescription": "Your changes have been saved.",
-    "loadFailed": "Could not load your profile."
+    "loadFailed": "Could not load your profile.",
+    "accountSection": "Account",
+    "accountSectionHint": "Sign out of your account on this device."
   },
   "notifications": {
     "title": "Notifications",

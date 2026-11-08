@@ -1,4 +1,6 @@
+import { PageHeader } from '@pg/ui';
 import { getTranslations } from 'next-intl/server';
+
 import { SubmitWizard } from '../../../../features/issues/SubmitWizard';
 
 export async function generateMetadata() {
@@ -8,19 +10,17 @@ export async function generateMetadata() {
 
 /**
  * Authed "report an issue" page — gated by the `(app)` route group's session
- * check (no PUBLIC_PATHS change needed). Heading/subtitle are server-rendered
- * static copy; the actual wizard (catalog/org reads + create mutation +
- * optional photo upload) is client-side (`SubmitWizard`).
+ * check (no PUBLIC_PATHS change needed). The `PageHeader` (title/subtitle) is
+ * server-rendered static chrome; the actual wizard (catalog/org reads +
+ * create mutation + optional photo upload) is client-side (`SubmitWizard`),
+ * mirroring `IssuesPage`'s server-shell + client-feature split.
  */
 export default async function ReportPage() {
   const t = await getTranslations('report');
 
   return (
-    <div className="flex flex-col gap-6 p-4" data-testid="report-page">
-      <div>
-        <h1 className="text-xl font-semibold text-neutral-900">{t('title')}</h1>
-        <p className="mt-1 text-sm text-neutral-600">{t('subtitle')}</p>
-      </div>
+    <div className="flex flex-col gap-6" data-testid="report-page">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
 
       <SubmitWizard />
     </div>

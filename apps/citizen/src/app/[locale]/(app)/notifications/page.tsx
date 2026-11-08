@@ -1,3 +1,4 @@
+import { PageHeader } from '@pg/ui';
 import { getTranslations } from 'next-intl/server';
 
 import { NotificationsList } from '../../../../features/notifications/NotificationsList';
@@ -18,8 +19,8 @@ export default async function NotificationsPage() {
   const t = await getTranslations('notifications');
 
   return (
-    <div className="flex flex-col gap-6 p-4" data-testid="notifications-page">
-      <h1 className="text-xl font-semibold text-neutral-900">{t('title')}</h1>
+    <div className="flex flex-col gap-6" data-testid="notifications-page">
+      <PageHeader title={t('title')} />
       <NotificationsList />
     </div>
   );
