@@ -105,9 +105,12 @@ export const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
             onChange={(event) => handleChange(index, event.target.value)}
             onKeyDown={(event) => handleKeyDown(index, event)}
             onPaste={(event) => handlePaste(index, event)}
+            // Revamp P2a — match the Input field surface: white bg, hairline
+            // neutral-200 border, rounded-lg; focus draws the brand ring and
+            // tints the border so the active cell is obvious during entry.
             className={cn(
-              'h-11 w-11 min-h-11 rounded-md border border-neutral-300 text-center text-lg font-medium text-neutral-900',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'h-11 w-11 min-h-11 rounded-lg border border-neutral-200 bg-white text-center text-lg font-medium text-neutral-900',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
               'disabled:pointer-events-none disabled:opacity-50',
             )}
           />

@@ -19,10 +19,16 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className="text-sm font-medium text-neutral-800">
+        {/* Label: neutral-600 per spec label hierarchy (quieter than body). */}
+        <label htmlFor={inputId} className="text-sm font-medium text-neutral-600">
           {label}
           {required && <span aria-hidden="true" className="text-status-escalated"> *</span>}
         </label>
+        {/* Revamp P2a — calm white field: bg-white + hairline neutral-200
+         * border, rounded-lg, comfortable px-3 py-2.5. Focus draws a brand
+         * ring AND tints the border so the active field reads clearly; error
+         * swaps border + ring to escalated-red (paired with the role="alert"
+         * message below, never color alone). */}
         <input
           ref={ref}
           id={inputId}
@@ -30,10 +36,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           aria-describedby={describedBy}
           required={required}
           className={cn(
-            'min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+            'min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900',
+            'placeholder:text-neutral-400',
+            'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
             'disabled:pointer-events-none disabled:opacity-50',
-            error && 'border-status-escalated focus-visible:ring-status-escalated',
+            error && 'border-status-escalated focus:ring-status-escalated focus:border-status-escalated',
             className,
           )}
           {...props}

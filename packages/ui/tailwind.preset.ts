@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import { breakpoint, neutral, priority, primary, radius, shadow, spacing, status } from './src/tokens';
+import { breakpoint, neutral, priority, primary, radius, shadow, spacing, status, surface } from './src/tokens';
 import { FONT_STACKS } from './src/fonts';
 
 /**
@@ -17,6 +17,10 @@ const preset: Partial<Config> = {
         neutral,
         status,
         priority,
+        // Semantic surface aliases (revamp P2a) — map to existing neutrals/
+        // white so the design spec's canvas/surface/border vocabulary is
+        // token-backed. Additive; does not shadow any existing utility.
+        surface,
       },
       spacing,
       borderRadius: radius,

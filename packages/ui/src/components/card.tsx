@@ -8,8 +8,12 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
+      // Revamp P2a — calm surface: white panel, hairline neutral-200 border,
+      // rounded-xl, and NO shadow (hierarchy comes from the border + spacing,
+      // not elevation). Floating surfaces that genuinely sit above the page
+      // (dropdowns/dialogs) opt into shadow-sm via className instead.
       className={cn(
-        'rounded-lg border border-neutral-200 bg-white p-4 shadow-sm',
+        'rounded-xl border border-neutral-200 bg-white p-5',
         className,
       )}
       {...props}

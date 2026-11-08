@@ -51,6 +51,11 @@
   --color-priority-high: #c2410c;
   --color-priority-urgent: #b91c1c;
 
+  /* Surface aliases (revamp P2a) — mirror neutral/white for CSS consumers */
+  --color-surface-canvas: #f8f9fa;
+  --color-surface-panel: #ffffff;
+  --color-surface-border: #dde1e6;
+
   /* Spacing */
   --spacing-0: 0px;
   --spacing-1: 0.25rem;

@@ -9,11 +9,24 @@ export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
 }
 
+// Revamp P2a — soft tinted banner with a colored left accent. The full
+// border stays a subtle same-hue tint for the rounded frame; `border-l-4`
+// adds a stronger colored rail on the leading edge so the variant reads at a
+// glance (paired with the colored icon + text — never color alone).
 const variantClasses: Record<AlertVariant, string> = {
-  info: 'border-primary-200 bg-primary-50 text-primary-900',
-  success: 'border-status-resolved bg-green-50 text-green-900',
-  warning: 'border-status-inProgress bg-amber-50 text-amber-900',
-  error: 'border-status-escalated bg-red-50 text-red-900',
+  info: 'border-primary-200 border-l-primary-500 bg-primary-50 text-primary-900',
+  success: 'border-green-200 border-l-status-resolved bg-green-50 text-green-900',
+  warning: 'border-amber-200 border-l-status-inProgress bg-amber-50 text-amber-900',
+  error: 'border-red-200 border-l-status-escalated bg-red-50 text-red-900',
+};
+
+// Icon tint per variant — stronger hue than the text so the leading glyph
+// anchors the banner's meaning.
+const iconClasses: Record<AlertVariant, string> = {
+  info: 'text-primary-600',
+  success: 'text-status-resolved',
+  warning: 'text-status-inProgress',
+  error: 'text-status-escalated',
 };
 
 /** role=alert is reserved for variants needing an assertive announcement. */
@@ -90,13 +103,13 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
         ref={ref}
         role={role}
         className={cn(
-          'flex gap-3 rounded-md border px-4 py-3 text-sm',
+          'flex gap-3 rounded-lg border border-l-4 px-4 py-3 text-sm',
           variantClasses[variant],
           className,
         )}
         {...props}
       >
-        <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+        <Icon className={cn('mt-0.5 h-5 w-5 flex-shrink-0', iconClasses[variant])} />
         <div className="flex flex-col gap-0.5">
           {title && <p className="font-medium">{title}</p>}
           {children && <div>{children}</div>}
