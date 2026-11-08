@@ -14,7 +14,8 @@ Decisions: subagent-driven phase-by-phase; Citizen = responsive desktop sidebar 
 ## Phase 3 — Citizen (11 screens + shell)
 - [x] Shell DONE (P3-shell): responsive layout — desktop `CitizenSidebar` (SidebarNav brand/nav/footer, sidebar-nav-<key> testids, Avatar+LogoutButton footer) + `CitizenTopBar` (page context + bell + LanguageSwitcher); mobile AppHeader+BottomNav restyled (icons, active indicator) and gated `lg:hidden`. All existing testids (bottom-nav-*, notification-bell, language switcher) preserved. Added `sidebar` i18n namespace (en+ml). citizen 89 tests, i18n parity, tsc, eslint, build all green. No assertions changed.
 - [ ] Landing `/`  - [ ] /login  - [ ] /verify  - [ ] /register  - [ ] /track
-- [ ] /home (overview, real counts)  - [ ] /issues (dashboard)  - [ ] /issues/[id] (detail+timeline)
+- [x] P3-auth DONE (5de7beb): landing/login/verify/register/track → shared AuthShell; all testids + Digit-N/Full-name/Save-and-continue preserved; no new i18n; 89 tests + parity + build green.
+- [x] P3-core DONE: /home (PageHeader greeting + StatCards with REAL useIssues-derived counts [total/submitted/in-progress/resolved] + recent-grievance preview + Submit CTA; empty-state when none), /issues (PageHeader + Submit action, restyled IssueCards, Loading/Error/Empty states — card testids kept), /issues/[id] (PageHeader ref+StatusBadge+back link, metadata Card, same-origin attachment, rail-and-dot Timeline Card). All testids + no-PII timeline + non-disclosing 404 intact. Added home.* / issues.submitCta i18n (en+ml). citizen 90 tests, i18n parity, tsc, eslint (0 err), build all green. home-overview.test rewritten for real-count behavior (justified).
 - [ ] /report (wizard)  - [ ] /notifications  - [ ] /profile (+logout)
 
 ## Phase 4 — Admin (6 functional + 10 placeholders + shell)

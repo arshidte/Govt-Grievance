@@ -87,11 +87,20 @@
   },
   "home": {
     "title": "Your overview",
+    "greeting": "Welcome back, {name}",
+    "subtitle": "A quick overview of your grievances and their status.",
+    "statTotal": "Total grievances",
+    "statSubmitted": "Submitted",
+    "statInProgress": "In progress",
+    "statResolved": "Resolved",
+    "recentTitle": "Recent grievances",
+    "viewAll": "View all",
+    "submitCta": "Submit a Grievance",
     "active": "Active",
     "awaiting": "Awaiting your response",
     "resolved": "Resolved",
-    "emptyTitle": "No issues reported yet",
-    "emptyDescription": "Issues you report will appear here with their status.",
+    "emptyTitle": "No grievances submitted yet",
+    "emptyDescription": "Grievances you submit will appear here with their status.",
     "reportCta": "Report an issue"
   },
   "report": {
@@ -146,8 +155,9 @@
     }
   },
   "issues": {
-    "dashboardTitle": "Your issues",
+    "dashboardTitle": "My grievances",
     "dashboardSubtitle": "Everything you've reported, with its latest status.",
+    "submitCta": "Submit a Grievance",
     "loadFailed": "Could not load your issues.",
     "emptyTitle": "No issues reported yet",
     "emptyDescription": "Issues you report will appear here with their status.",
