@@ -110,11 +110,23 @@ model RoleAssignment {
   wardId      String?
   ward        Ward?      @relation(fields: [wardId], references: [id])
   grantedBy   String?
+  // Soft-revocation (org-management milestone): an assignment is ACTIVE while
+  // `revokedAt` is NULL and REVOKED once stamped. Revoked rows are never
+  // deleted (assignment history is preserved) and must no longer grant
+  // authorization — `AccessControlService` only ever loads active rows.
+  // `revokedBy` mirrors the relation-less `grantedBy` (actor id, no FK).
+  // The partial unique indexes are recreated WITH `revokedAt IS NULL` so
+  // uniqueness constrains only ACTIVE assignments (a user may be re-assigned
+  // to a ward/panchayat they were previously revoked from). See migration
+  // 20261109000000_org_mgmt_soft_revoke.
+  revokedAt   DateTime?
+  revokedBy   String?
   createdAt   DateTime   @default(now())
 
   // Uniqueness + role<->scope coherence are enforced by PARTIAL unique
   // indexes and a CHECK constraint (raw SQL, not expressible in Prisma
-  // schema) — see migration 20261015000000_roleassignment_integrity. A plain
+  // schema) — see migrations 20261015000000_roleassignment_integrity and
+  // 20261109000000_org_mgmt_soft_revoke. A plain
   // `@@unique([userId, role, panchayatId, wardId])` is INEFFECTIVE here
   // because PostgreSQL treats NULL scope columns as distinct, so it is
   // intentionally omitted in favour of the partial indexes.

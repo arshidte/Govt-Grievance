@@ -49,6 +49,35 @@ describe('BFF general proxy route handler (/api/v1/*) — admin hardened allowli
       expect(isAllowed('PATCH', ['issues', 'x', 'status'])).toBe(true);
     });
 
+    it('allows the org-management (method, path) pairs (admin modules)', () => {
+      expect(isAllowed('GET', ['panchayats'])).toBe(true);
+      expect(isAllowed('POST', ['panchayats'])).toBe(true);
+      expect(isAllowed('GET', ['panchayats', 'p1'])).toBe(true);
+      expect(isAllowed('PATCH', ['panchayats', 'p1'])).toBe(true);
+      expect(isAllowed('POST', ['panchayats', 'p1', 'deactivate'])).toBe(true);
+      expect(isAllowed('POST', ['panchayats', 'p1', 'reactivate'])).toBe(true);
+      expect(isAllowed('GET', ['panchayats', 'p1', 'wards'])).toBe(true);
+      expect(isAllowed('POST', ['panchayats', 'p1', 'wards'])).toBe(true);
+      expect(isAllowed('GET', ['wards', 'w1'])).toBe(true);
+      expect(isAllowed('PATCH', ['wards', 'w1'])).toBe(true);
+      expect(isAllowed('POST', ['wards', 'w1', 'deactivate'])).toBe(true);
+      expect(isAllowed('POST', ['wards', 'w1', 'reactivate'])).toBe(true);
+      expect(isAllowed('GET', ['staff', 'search'])).toBe(true);
+      expect(isAllowed('GET', ['representatives'])).toBe(true);
+      expect(isAllowed('POST', ['representatives'])).toBe(true);
+      expect(isAllowed('POST', ['representatives', 'a1', 'revoke'])).toBe(true);
+      expect(isAllowed('GET', ['coordinators'])).toBe(true);
+      expect(isAllowed('POST', ['coordinators'])).toBe(true);
+      expect(isAllowed('POST', ['coordinators', 'a1', 'revoke'])).toBe(true);
+    });
+
+    it('still blocks non-surface org verbs/shapes', () => {
+      expect(isAllowed('DELETE', ['panchayats', 'p1'])).toBe(false);
+      expect(isAllowed('PATCH', ['panchayats'])).toBe(false);
+      expect(isAllowed('GET', ['representatives', 'a1', 'revoke'])).toBe(false); // revoke is POST-only
+      expect(isAllowed('POST', ['staff', 'search'])).toBe(false); // search is GET-only
+    });
+
     it('matches method case-insensitively but exactly (GET ≠ PATCH)', () => {
       expect(isAllowed('get', ['issues'])).toBe(true);
       expect(isAllowed('patch', ['issues', 'x', 'status'])).toBe(true);
@@ -64,7 +93,6 @@ describe('BFF general proxy route handler (/api/v1/*) — admin hardened allowli
       expect(isAllowed('GET', ['notifications'])).toBe(false);
       expect(isAllowed('PATCH', ['notifications', 'n1', 'read'])).toBe(false);
       expect(isAllowed('GET', ['categories'])).toBe(false);
-      expect(isAllowed('GET', ['panchayats'])).toBe(false);
       expect(isAllowed('GET', ['users', 'me'])).toBe(false);
       expect(isAllowed('PATCH', ['users', 'me'])).toBe(false);
       expect(isAllowed('GET', ['dev', 'last-otp'])).toBe(false);

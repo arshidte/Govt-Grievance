@@ -1,27 +1,11 @@
-import { getTranslations } from 'next-intl/server';
-import { ModulePage } from '../../../../components/ModulePage';
+import { PanchayatsManager } from '../../../../features/org/panchayats/PanchayatsManager';
 
 /**
- * Placeholder shell for the panchayats module (M2+ scope — see ModulePage.tsx).
- * Reached only once the `(app)` layout's staff gate + shell have passed;
- * this page itself does no auth work.
+ * Admin Panchayats management (org-management milestone — replaces the
+ * `ModulePage` placeholder). Reached only after the `(app)` layout's
+ * `requireStaff` gate; every mutation the client component triggers is
+ * additionally Global-Admin-only server-side (RbacGuard + @Roles('ADMIN')).
  */
-export default async function PanchayatsPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  const [tNav, tModules] = await Promise.all([
-    getTranslations({ locale, namespace: 'nav' }),
-    getTranslations({ locale, namespace: 'admin.modules' }),
-  ]);
-
-  return (
-    <ModulePage
-      title={tNav('panchayats')}
-      description={tModules('panchayatsDescription')}
-      testId="admin-panchayats-page"
-    />
-  );
+export default function PanchayatsPage() {
+  return <PanchayatsManager />;
 }

@@ -94,6 +94,34 @@ const ADMIN_ALLOWLIST: readonly AllowlistEntry[] = [
   // Attachments (download a stored attachment by id; owner-or-in-scope-staff
   // authorized server-side).
   { method: 'GET', pattern: 'attachments/:id' },
+
+  // Organization management (org-management milestone). READS are authed;
+  // every MUTATION is additionally Global-Admin-only server-side (RbacGuard
+  // + @Roles('ADMIN')) — the allowlist only relays the shape, it is NOT the
+  // authorization boundary. Query strings (`?includeInactive`, `?phone`) are
+  // forwarded by `proxyToApi` and don't affect path matching.
+  //   Panchayats
+  { method: 'GET', pattern: 'panchayats' },
+  { method: 'POST', pattern: 'panchayats' },
+  { method: 'GET', pattern: 'panchayats/:id' },
+  { method: 'PATCH', pattern: 'panchayats/:id' },
+  { method: 'POST', pattern: 'panchayats/:id/deactivate' },
+  { method: 'POST', pattern: 'panchayats/:id/reactivate' },
+  { method: 'GET', pattern: 'panchayats/:id/wards' },
+  { method: 'POST', pattern: 'panchayats/:id/wards' },
+  //   Wards (item ops by ward id)
+  { method: 'GET', pattern: 'wards/:id' },
+  { method: 'PATCH', pattern: 'wards/:id' },
+  { method: 'POST', pattern: 'wards/:id/deactivate' },
+  { method: 'POST', pattern: 'wards/:id/reactivate' },
+  //   Staff search + representative/coordinator assignments
+  { method: 'GET', pattern: 'staff/search' },
+  { method: 'GET', pattern: 'representatives' },
+  { method: 'POST', pattern: 'representatives' },
+  { method: 'POST', pattern: 'representatives/:id/revoke' },
+  { method: 'GET', pattern: 'coordinators' },
+  { method: 'POST', pattern: 'coordinators' },
+  { method: 'POST', pattern: 'coordinators/:id/revoke' },
 ];
 
 /**

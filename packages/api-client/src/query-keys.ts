@@ -16,4 +16,17 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   /** Shares the `['notifications']` prefix with `notifications` above, so invalidating that base key cascades here too. */
   unreadCount: ['notifications', 'unread-count'] as const,
+
+  // ---- Admin org-management (all share the `['admin']` prefix so a broad
+  //      invalidation can refresh every org list at once). ----
+  /** Admin panchayat list (includes inactive). */
+  adminPanchayats: ['admin', 'panchayats'] as const,
+  /** Admin single-panchayat detail. Shares the `['admin','panchayats']` prefix. */
+  adminPanchayat: (id: string) => ['admin', 'panchayats', id] as const,
+  /** Admin ward list for a panchayat (includes inactive); keyed per parent. */
+  adminWards: (panchayatId: string) => ['admin', 'wards', panchayatId] as const,
+  /** Admin representative list (users with active ward assignments). */
+  adminRepresentatives: ['admin', 'representatives'] as const,
+  /** Admin coordinator list (users with active panchayat assignments). */
+  adminCoordinators: ['admin', 'coordinators'] as const,
 };

@@ -1,16 +1,28 @@
 import type {
+  AssignCoordinatorInput,
+  AssignRepresentativeInput,
   AttachmentDTO,
   CategoryDTO,
+  CoordinatorAssignmentDTO,
+  CoordinatorDTO,
   CreateIssueInput,
   CreateOnBehalfInput,
+  CreatePanchayatInput,
+  CreateWardInput,
   IssueDetailDTO,
   IssueSummaryDTO,
   MeResponse,
   NotificationDTO,
+  PanchayatDetailDTO,
   PanchayatDTO,
+  RepresentativeAssignmentDTO,
+  RepresentativeDTO,
   RequestOtpInput,
+  StaffUserDTO,
   TransitionInput,
+  UpdatePanchayatInput,
   UpdateProfileInput,
+  UpdateWardInput,
   VerifyOtpInput,
   WardDTO,
 } from '@pg/types';
@@ -85,9 +97,27 @@ export interface ApiClient {
   logout(): Promise<OkResponse>;
   getMe(): Promise<MeResponse>;
   getCategories(): Promise<CategoryDTO[]>;
-  getPanchayats(): Promise<PanchayatDTO[]>;
-  getWards(panchayatId: string): Promise<WardDTO[]>;
+  getPanchayats(includeInactive?: boolean): Promise<PanchayatDTO[]>;
+  getWards(panchayatId: string, includeInactive?: boolean): Promise<WardDTO[]>;
   updateProfile(input: UpdateProfileInput): Promise<MeResponse>;
+
+  // ---- Admin org-management (Global-Admin only, enforced server-side) ----
+  getPanchayat(id: string): Promise<PanchayatDetailDTO>;
+  createPanchayat(input: CreatePanchayatInput): Promise<PanchayatDetailDTO>;
+  updatePanchayat(id: string, input: UpdatePanchayatInput): Promise<PanchayatDetailDTO>;
+  deactivatePanchayat(id: string): Promise<PanchayatDetailDTO>;
+  reactivatePanchayat(id: string): Promise<PanchayatDetailDTO>;
+  createWard(panchayatId: string, input: CreateWardInput): Promise<WardDTO>;
+  updateWard(wardId: string, input: UpdateWardInput): Promise<WardDTO>;
+  deactivateWard(wardId: string): Promise<WardDTO>;
+  reactivateWard(wardId: string): Promise<WardDTO>;
+  searchStaff(phone: string): Promise<StaffUserDTO | null>;
+  listRepresentatives(): Promise<RepresentativeDTO[]>;
+  assignRepresentative(input: AssignRepresentativeInput): Promise<RepresentativeAssignmentDTO>;
+  revokeRepresentative(assignmentId: string): Promise<{ revoked: true }>;
+  listCoordinators(): Promise<CoordinatorDTO[]>;
+  assignCoordinator(input: AssignCoordinatorInput): Promise<CoordinatorAssignmentDTO>;
+  revokeCoordinator(assignmentId: string): Promise<{ revoked: true }>;
   createIssue(input: CreateIssueInput, idempotencyKey?: string): Promise<IssueDetailDTO>;
   createOnBehalf(input: CreateOnBehalfInput, idempotencyKey?: string): Promise<OnBehalfResult>;
   listIssues(params?: { status?: string }): Promise<IssueSummaryDTO[]>;
@@ -176,16 +206,99 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
 
     getCategories: () => request<CategoryDTO[]>('/categories', { method: 'GET' }),
 
-    getPanchayats: () => request<PanchayatDTO[]>('/panchayats', { method: 'GET' }),
+    getPanchayats: (includeInactive) =>
+      request<PanchayatDTO[]>(`/panchayats${includeInactive ? '?includeInactive=true' : ''}`, {
+        method: 'GET',
+      }),
 
-    getWards: (panchayatId) =>
-      request<WardDTO[]>(`/panchayats/${encodeURIComponent(panchayatId)}/wards`, { method: 'GET' }),
+    getWards: (panchayatId, includeInactive) =>
+      request<WardDTO[]>(
+        `/panchayats/${encodeURIComponent(panchayatId)}/wards${
+          includeInactive ? '?includeInactive=true' : ''
+        }`,
+        { method: 'GET' },
+      ),
 
     updateProfile: (input) =>
       request<MeResponse>('/users/me', {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
+
+    // ---- Admin org-management --------------------------------------------
+    getPanchayat: (id) =>
+      request<PanchayatDetailDTO>(`/panchayats/${encodeURIComponent(id)}`, { method: 'GET' }),
+
+    createPanchayat: (input) =>
+      request<PanchayatDetailDTO>('/panchayats', { method: 'POST', body: JSON.stringify(input) }),
+
+    updatePanchayat: (id, input) =>
+      request<PanchayatDetailDTO>(`/panchayats/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
+    deactivatePanchayat: (id) =>
+      request<PanchayatDetailDTO>(`/panchayats/${encodeURIComponent(id)}/deactivate`, {
+        method: 'POST',
+      }),
+
+    reactivatePanchayat: (id) =>
+      request<PanchayatDetailDTO>(`/panchayats/${encodeURIComponent(id)}/reactivate`, {
+        method: 'POST',
+      }),
+
+    createWard: (panchayatId, input) =>
+      request<WardDTO>(`/panchayats/${encodeURIComponent(panchayatId)}/wards`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    updateWard: (wardId, input) =>
+      request<WardDTO>(`/wards/${encodeURIComponent(wardId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+
+    deactivateWard: (wardId) =>
+      request<WardDTO>(`/wards/${encodeURIComponent(wardId)}/deactivate`, { method: 'POST' }),
+
+    reactivateWard: (wardId) =>
+      request<WardDTO>(`/wards/${encodeURIComponent(wardId)}/reactivate`, { method: 'POST' }),
+
+    searchStaff: (phone) =>
+      request<StaffUserDTO | null>(`/staff/search?phone=${encodeURIComponent(phone)}`, {
+        method: 'GET',
+      }),
+
+    listRepresentatives: () =>
+      request<RepresentativeDTO[]>('/representatives', { method: 'GET' }),
+
+    assignRepresentative: (input) =>
+      request<RepresentativeAssignmentDTO>('/representatives', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    revokeRepresentative: (assignmentId) =>
+      request<{ revoked: true }>(
+        `/representatives/${encodeURIComponent(assignmentId)}/revoke`,
+        { method: 'POST' },
+      ),
+
+    listCoordinators: () => request<CoordinatorDTO[]>('/coordinators', { method: 'GET' }),
+
+    assignCoordinator: (input) =>
+      request<CoordinatorAssignmentDTO>('/coordinators', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    revokeCoordinator: (assignmentId) =>
+      request<{ revoked: true }>(
+        `/coordinators/${encodeURIComponent(assignmentId)}/revoke`,
+        { method: 'POST' },
+      ),
 
     createIssue: (input, idempotencyKey) =>
       request<IssueDetailDTO>('/issues', {
