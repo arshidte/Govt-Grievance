@@ -67,6 +67,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Generate the Prisma Client BEFORE any step that imports it. Install
+      # does not run `prisma generate` (there is no postinstall hook), so on a
+      # fresh runner the client is absent until the build step would otherwise
+      # produce it — but the earlier "Seed database" step (`tsx prisma/seed.ts`)
+      # already imports `@prisma/client` and fails without it. Generating here
+      # fixes the seed step and also satisfies the later typecheck/build/test.
+      - name: Prisma generate
+        working-directory: apps/api
+        run: pnpm exec prisma generate
+
       - name: Prisma migrate deploy
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy
