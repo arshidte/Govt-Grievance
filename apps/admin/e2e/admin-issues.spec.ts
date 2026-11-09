@@ -144,7 +144,9 @@ async function registerCitizenAndSubmitWardOneIssue(
   await cz.getByRole('button', { name: 'Save and continue' }).click();
   await expect(cz).toHaveURL(/\/home$/);
 
-  await cz.getByTestId('bottom-nav-report').click();
+  // Desktop Chrome viewport: the citizen bottom nav is `lg:hidden`, so drive
+  // the persistent sidebar nav (same keys) instead.
+  await cz.getByTestId('sidebar-nav-report').click();
   await expect(cz).toHaveURL(/\/report$/);
   await expect(cz.getByTestId('report-wizard')).toBeVisible();
 
@@ -174,7 +176,7 @@ async function registerCitizenAndSubmitWardOneIssue(
 
   // Navigate to the dashboard and into the issue's own detail page, purely
   // to capture its id (from the URL) for Test 2's direct-navigation check.
-  await cz.getByTestId('bottom-nav-issues').click();
+  await cz.getByTestId('sidebar-nav-issues').click();
   await expect(cz).toHaveURL(/\/issues$/);
   const issueCard = cz.getByTestId('issue-card').filter({ hasText: referenceNo });
   await expect(issueCard).toHaveCount(1);

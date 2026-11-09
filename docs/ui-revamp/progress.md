@@ -26,7 +26,10 @@ Decisions: subagent-driven phase-by-phase; Citizen = responsive desktop sidebar 
 - [x] P4c DONE: 11 placeholder modules (audit-logs, categories, citizens, coordinators, escalations, panchayats, reports, representatives, settings, wards, notifications) all route through the single shared `ModulePage` — restyled once: shared `PageHeader` band (matches dashboard/triage) + bordered white panel wrapping the restyled `EmptyState` (icon chip + honest "arrives in a later milestone" copy). testId root + `${testId}-empty-state` preserved; no caller/i18n changes. typecheck/lint(0)/64 tests/build green. --- ADMIN APP COMPLETE (Phase 4) ---
 
 ## Phase 5 — Responsive + quality
-- [ ] desktop/tablet/mobile passes  - [ ] states audit  - [ ] a11y + en/ml  - [ ] full gate (lint/typecheck/test/build) + both Playwright suites
+- [x] Full UI gate GREEN: `turbo run lint typecheck test build` across @pg/ui + @pg/citizen + @pg/admin + @pg/i18n → 11/11 tasks successful. (@pg/api untouched; already CI-verified.)
+- [x] Playwright nav migration DONE: citizen suite runs at Desktop Chrome (≥lg) where bottom-nav is `lg:hidden`, so the 5 `bottom-nav-*` clicks → `sidebar-nav-*` (citizen-auth: profile; citizen-issues: report/issues/issues; admin-issues `cz`: report/issues). Verified sidebar-nav-<key> testids exist + active→aria-current wired; comments updated. `playwright test --list` parses both suites: 2 citizen + 8 admin tests intact. NO assertion weakened (same flows, correct nav for the viewport).
+- [ ] e2e RUN blocked: needs Postgres on :5435 (webServer migrates+seeds+builds API+app). Docker daemon is DOWN locally → cannot execute `pnpm test:e2e` here. ASK USER to start Docker Desktop (then `docker compose -f docker-compose.dev.yml up -d` + `pnpm test:e2e`), or I run it once the daemon is up. Also runs in CI on the eventual PR.
+- [~] Responsive/states/a11y/en-ml applied per-phase via design-language (sidebar+drawer+bottom-nav, LoadingState/EmptyState/ErrorState, aria-current/role=alert/labels, all new strings en+ml parity-enforced). Final holistic pass pending the live e2e run.
 
 ## Log
 (append per-unit results here)

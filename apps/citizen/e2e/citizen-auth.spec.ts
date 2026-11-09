@@ -81,12 +81,13 @@ test.describe('citizen auth', () => {
     await expect(page.getByTestId('home-overview')).toBeVisible();
     await expect(page.getByTestId('home-empty-state')).toBeVisible();
 
-    // T24: navigate via the sticky bottom nav (44px targets, aria-current)
-    // to /profile and confirm the user's own phone is shown, pre-filled
-    // and read-only, from `useMe` through the BFF.
-    await page.getByTestId('bottom-nav-profile').click();
+    // T24: navigate via the desktop sidebar nav (the bottom nav is `lg:hidden`
+    // at this Desktop Chrome viewport; the sidebar carries the same keys with
+    // 44px targets + aria-current) to /profile and confirm the user's own
+    // phone is shown, pre-filled and read-only, from `useMe` through the BFF.
+    await page.getByTestId('sidebar-nav-profile').click();
     await expect(page).toHaveURL(/\/profile$/);
-    await expect(page.getByTestId('bottom-nav-profile')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('sidebar-nav-profile')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('profile-phone')).toHaveValue(phone);
 
     // T24: the LanguageSwitcher (in the authed shell's header) toggles

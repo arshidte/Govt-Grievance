@@ -129,9 +129,9 @@ test.describe('citizen issues + notifications', () => {
 
     await loginNewCitizen(page, baseURL, phone);
 
-    // Navigate to the wizard via the bottom nav (confirms the nav item
-    // itself, not just the route).
-    await page.getByTestId('bottom-nav-report').click();
+    // Navigate to the wizard via the desktop sidebar nav (confirms the nav
+    // item itself, not just the route; the bottom nav is `lg:hidden` here).
+    await page.getByTestId('sidebar-nav-report').click();
     await expect(page).toHaveURL(/\/report$/);
     await expect(page.getByTestId('report-wizard')).toBeVisible();
 
@@ -164,8 +164,8 @@ test.describe('citizen issues + notifications', () => {
     const referenceNo = (await page.getByTestId('reference-number').textContent())?.trim() ?? '';
     expect(referenceNo).toMatch(/^GRV-\d{4}-\d{6}/);
 
-    // Dashboard: navigate via the bottom nav and find the just-created issue.
-    await page.getByTestId('bottom-nav-issues').click();
+    // Dashboard: navigate via the desktop sidebar nav and find the just-created issue.
+    await page.getByTestId('sidebar-nav-issues').click();
     await expect(page).toHaveURL(/\/issues$/);
     await expect(page.getByTestId('issues-dashboard')).toBeVisible();
 
@@ -205,7 +205,7 @@ test.describe('citizen issues + notifications', () => {
 
     // en -> ml toggle: switch locale via the LanguageSwitcher and confirm
     // the issues dashboard heading renders in Malayalam.
-    await page.getByTestId('bottom-nav-issues').click();
+    await page.getByTestId('sidebar-nav-issues').click();
     await expect(page).toHaveURL(/\/issues$/);
     await page.getByRole('radio', { name: 'ML' }).click();
     await expect(page.getByRole('heading', { name: 'നിങ്ങളുടെ പരാതികൾ' })).toBeVisible();
