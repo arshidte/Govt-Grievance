@@ -1,4 +1,6 @@
 import { getTranslations } from 'next-intl/server';
+
+import { AuthShell } from '../../../components/AuthShell';
 import { TrackLookup } from '../../../features/track/TrackLookup';
 
 export async function generateMetadata() {
@@ -15,20 +17,21 @@ export async function generateMetadata() {
  * any citizen/issue personal data. When M2 wires up a real lookup, any
  * response containing personal data MUST stay behind an auth check; this
  * page's job is to never render it pre-auth.
+ *
+ * Revamp P3 — centered card layout via the shared `AuthShell`; the lookup
+ * form + result states live in `TrackLookup` (testids + behaviour intact).
  */
 export default async function TrackPage() {
   const t = await getTranslations('track');
+  const tCommon = await getTranslations('common');
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-6 p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">{t('title')}</h1>
-          <p className="mt-1 text-sm text-neutral-600">{t('subtitle')}</p>
-        </div>
-
-        <TrackLookup />
-      </div>
-    </main>
+    <AuthShell
+      appName={tCommon('appName')}
+      title={t('title')}
+      subtitle={t('subtitle')}
+    >
+      <TrackLookup />
+    </AuthShell>
   );
 }

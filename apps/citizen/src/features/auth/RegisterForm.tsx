@@ -59,13 +59,18 @@ export function RegisterForm({ onSaved }: RegisterFormProps) {
         {...register('addressLine')}
       />
 
+      {/* Native <select> kept (not the controlled `@pg/ui` Select) so the
+          react-hook-form `register(...)` wiring stays untouched; only the
+          classes are restyled to the P3 field recipe — white surface,
+          hairline neutral-200 border, rounded-lg, brand focus ring — to
+          match the `Input` fields above it. */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="preferredLanguage" className="text-sm font-medium text-neutral-800">
+        <label htmlFor="preferredLanguage" className="text-sm font-medium text-neutral-600">
           {t('auth.languageLabel')}
         </label>
         <select
           id="preferredLanguage"
-          className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
+          className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
           {...register('preferredLanguage')}
         >
           <option value="en">English</option>

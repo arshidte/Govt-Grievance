@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { roleLabelKey } from '@pg/i18n';
 import { useIssue } from '@pg/api-client';
 import type { IssueStatusHistoryDTO, Role } from '@pg/types';
-import { ErrorState, LoadingState, PriorityBadge, StatusBadge } from '@pg/ui';
+import { Card, ErrorState, LoadingState, PageHeader, PriorityBadge, StatusBadge } from '@pg/ui';
 
 import { useApiClient } from '../auth/api-client';
 import { StatusTransitionControl } from './StatusTransitionControl';
@@ -62,7 +62,7 @@ function StaffTimeline({ entries }: { entries: IssueStatusHistoryDTO[] }) {
           <li
             key={entry.id}
             data-testid="staff-timeline-entry"
-            className="flex flex-col gap-1.5 border-l-2 border-neutral-200 pl-3"
+            className="flex flex-col gap-1.5 border-l-2 border-neutral-200 pl-4"
           >
             <div className="flex flex-wrap items-center gap-1.5">
               <StatusBadge status={entry.fromStatus} t={tRoot} />
@@ -104,6 +104,12 @@ function StaffTimeline({ entries }: { entries: IssueStatusHistoryDTO[] }) {
  * whole screen is an interim stopgap — see that component's own comment).
  * Does NOT resolve category/ward NAMES (out of scope per the brief) — only
  * title/description/categoryId/wardId at the id level, same as citizen.
+ *
+ * Revamp P4b — restyled: a `PageHeader` (reference + current-status
+ * `StatusBadge`), a metadata `Card` (title/description/priority/created +
+ * attachment), the `StatusTransitionControl` in its own `Card`, and the
+ * proceedings timeline in a third `Card`. All testids, the non-disclosing
+ * 404, and the same-origin attachment are unchanged.
  */
 export function StaffIssueDetail({ id }: StaffIssueDetailProps) {
   const t = useTranslations('staffTriage');
@@ -137,56 +143,69 @@ export function StaffIssueDetail({ id }: StaffIssueDetailProps) {
     <div className="flex flex-col gap-6" data-testid="staff-issue-detail">
       <TemporaryNotice />
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-neutral-500">{data.referenceNo}</span>
-        <h1 className="text-xl font-semibold text-neutral-900">{data.title}</h1>
-      </div>
+      {/* Page header: reference as the title context + the CURRENT status as
+          a right-aligned badge action, so the issue's state reads at a glance. */}
+      <PageHeader
+        title={data.referenceNo}
+        actions={<StatusBadge status={data.status} t={tRoot} />}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={data.status} t={tRoot} />
-        <PriorityBadge priority={data.priority} t={tRoot} />
-      </div>
-
-      <p className="text-sm text-neutral-700">{data.description}</p>
-
-      <dl className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <dt className="text-xs font-medium text-neutral-500">{t('createdAtLabel')}</dt>
-          <dd className="text-neutral-900">{dateFormatter.format(new Date(data.createdAt))}</dd>
+      {/* Metadata card — the issue's own fields: title, description,
+          read-only priority, and the creation date. */}
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-neutral-900">{data.title}</h2>
+          <PriorityBadge priority={data.priority} t={tRoot} className="self-start" />
         </div>
-      </dl>
 
-      {data.attachment && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-neutral-500">{t('attachmentLabel')}</span>
-          {data.attachment.mimeType.startsWith('image/') ? (
-            // Plain <img>, not next/image — same rationale as the citizen
-            // `IssueDetail`: a same-origin BFF stream, not a remote/
-            // optimizable asset next/image expects a loader config for.
-            <img
-              src={attachmentUrl(data.attachment.id)}
-              alt={t('attachmentAlt')}
-              data-testid="staff-issue-attachment"
-              className="max-h-64 w-auto rounded-md border border-neutral-200 object-contain"
-            />
-          ) : (
-            <a
-              href={attachmentUrl(data.attachment.id)}
-              data-testid="staff-issue-attachment"
-              className="text-sm font-medium text-primary-700 hover:underline"
-            >
-              {t('downloadAttachment')}
-            </a>
-          )}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-neutral-500">{t('descriptionLabel')}</span>
+          <p className="text-sm text-neutral-700">{data.description}</p>
         </div>
-      )}
 
-      <StatusTransitionControl issue={data} />
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-xs font-medium text-neutral-500">{t('createdAtLabel')}</dt>
+            <dd className="text-neutral-900">{dateFormatter.format(new Date(data.createdAt))}</dd>
+          </div>
+        </dl>
 
-      <div className="flex flex-col gap-2">
+        {data.attachment && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-neutral-500">{t('attachmentLabel')}</span>
+            {data.attachment.mimeType.startsWith('image/') ? (
+              // Plain <img>, not next/image — same rationale as the citizen
+              // `IssueDetail`: a same-origin BFF stream, not a remote/
+              // optimizable asset next/image expects a loader config for.
+              <img
+                src={attachmentUrl(data.attachment.id)}
+                alt={t('attachmentAlt')}
+                data-testid="staff-issue-attachment"
+                className="max-h-64 w-auto rounded-lg border border-neutral-200 object-contain"
+              />
+            ) : (
+              <a
+                href={attachmentUrl(data.attachment.id)}
+                data-testid="staff-issue-attachment"
+                className="text-sm font-medium text-primary-700 hover:underline"
+              >
+                {t('downloadAttachment')}
+              </a>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* The one staff-only action this screen exists for, in its own card. */}
+      <Card>
+        <StatusTransitionControl issue={data} />
+      </Card>
+
+      {/* Proceedings timeline — role labels only, never actor PII. */}
+      <Card className="flex flex-col gap-3">
         <h2 className="text-base font-semibold text-neutral-900">{t('timelineTitle')}</h2>
         <StaffTimeline entries={data.timeline} />
-      </div>
+      </Card>
     </div>
   );
 }

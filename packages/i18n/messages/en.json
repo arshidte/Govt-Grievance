@@ -6,6 +6,11 @@
     "emptyTitle": "No issues to triage",
     "emptyDescription": "Issues in your scope will appear here.",
     "createdOnLabel": "Reported on {date}",
+    "columnReference": "Reference",
+    "columnTitle": "Title",
+    "columnStatus": "Status",
+    "columnPriority": "Priority",
+    "columnCreated": "Reported",
     "detailTitle": "Issue details",
     "descriptionLabel": "Description",
     "createdAtLabel": "Reported on",
@@ -87,11 +92,20 @@
   },
   "home": {
     "title": "Your overview",
+    "greeting": "Welcome back, {name}",
+    "subtitle": "A quick overview of your grievances and their status.",
+    "statTotal": "Total grievances",
+    "statSubmitted": "Submitted",
+    "statInProgress": "In progress",
+    "statResolved": "Resolved",
+    "recentTitle": "Recent grievances",
+    "viewAll": "View all",
+    "submitCta": "Submit a Grievance",
     "active": "Active",
     "awaiting": "Awaiting your response",
     "resolved": "Resolved",
-    "emptyTitle": "No issues reported yet",
-    "emptyDescription": "Issues you report will appear here with their status.",
+    "emptyTitle": "No grievances submitted yet",
+    "emptyDescription": "Grievances you submit will appear here with their status.",
     "reportCta": "Report an issue"
   },
   "report": {
@@ -114,12 +128,18 @@
     "descriptionRequired": "Please describe the issue.",
     "photoLabel": "Photo (optional)",
     "photoHint": "You can attach a JPEG, PNG or WebP image.",
+    "sectionLocation": "Location",
+    "sectionLocationHint": "Where is the issue? Pick the category and the panchayat and ward it affects.",
+    "sectionDetails": "Details",
+    "sectionDetailsHint": "Give the issue a short title and describe what's wrong.",
+    "sectionPhoto": "Photo",
     "reviewHeading": "Review before submitting",
     "reviewEmpty": "No title entered yet.",
     "submitCta": "Submit grievance",
     "submitFailed": "Could not submit your grievance. Please try again.",
     "confirmTitle": "Grievance submitted",
     "confirmDescription": "Keep this reference number to track your grievance.",
+    "confirmNextSteps": "You can view the status of this grievance any time from the Grievances page.",
     "referenceNumberLabel": "Your reference number",
     "photoUploadFailed": "Your grievance was submitted, but the photo could not be uploaded."
   },
@@ -129,7 +149,9 @@
     "phoneLabel": "Mobile number",
     "saveSuccessTitle": "Profile updated",
     "saveSuccessDescription": "Your changes have been saved.",
-    "loadFailed": "Could not load your profile."
+    "loadFailed": "Could not load your profile.",
+    "accountSection": "Account",
+    "accountSectionHint": "Sign out of your account on this device."
   },
   "notifications": {
     "title": "Notifications",
@@ -146,8 +168,9 @@
     }
   },
   "issues": {
-    "dashboardTitle": "Your issues",
+    "dashboardTitle": "My grievances",
     "dashboardSubtitle": "Everything you've reported, with its latest status.",
+    "submitCta": "Submit a Grievance",
     "loadFailed": "Could not load your issues.",
     "emptyTitle": "No issues reported yet",
     "emptyDescription": "Issues you report will appear here with their status.",
@@ -176,6 +199,15 @@
     "report": "Report",
     "issues": "Issues",
     "profile": "Profile"
+  },
+  "sidebar": {
+    "navLabel": "Main navigation",
+    "home": "Home",
+    "issues": "My Grievances",
+    "report": "Submit a Grievance",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "signedInAs": "Signed in"
   },
   "languageSwitcher": {
     "label": "Language",
@@ -265,15 +297,28 @@
     "loginSubtitle": "Sign in with your mobile number to access the admin console.",
     "forbiddenTitle": "Access denied",
     "forbiddenDescription": "Your account does not have staff access to the admin console.",
+    "roles": {
+      "admin": "Administrator",
+      "coordinator": "Coordinator",
+      "representative": "Representative",
+      "staff": "Staff"
+    },
     "dashboard": {
       "title": "Dashboard",
-      "subtitle": "An overview of activity across your panchayats.",
-      "openIssues": "Open issues",
-      "escalatedIssues": "Escalated issues",
-      "resolvedThisMonth": "Resolved this month",
-      "pendingCitizens": "Pending registrations",
-      "emptyTitle": "No data yet",
-      "emptyDescription": "Dashboard data arrives in later milestones."
+      "subtitle": "An overview of the grievances in your scope.",
+      "scopeSubtitle": "An overview of the grievances in your scope ({role}).",
+      "statTotal": "In scope",
+      "statSubmitted": "Submitted",
+      "statAcknowledged": "Acknowledged",
+      "statInProgress": "In progress",
+      "statResolved": "Resolved",
+      "viewTriageCta": "Go to triage",
+      "loadFailed": "Could not load your grievances.",
+      "recentTitle": "Recent grievances",
+      "viewAll": "View all",
+      "createdOnLabel": "Reported on {date}",
+      "emptyTitle": "No grievances in your scope yet",
+      "emptyDescription": "Grievances assigned to your scope will appear here."
     },
     "modules": {
       "issuesDescription": "Case management for citizen-reported issues arrives in a later milestone.",

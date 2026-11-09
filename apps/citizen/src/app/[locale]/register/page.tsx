@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
+import { AuthShell } from '../../../components/AuthShell';
 import { RegisterForm } from '../../../features/auth/RegisterForm';
 
 /**
@@ -13,22 +14,24 @@ import { RegisterForm } from '../../../features/auth/RegisterForm';
  * reaches this page they already have one (set during verify-otp); it's
  * public here mainly so the auth gate's redirect-to-/login logic doesn't
  * need special-casing this transitional page.
+ *
+ * Revamp P3 — centered auth layout via the shared `AuthShell`; the form
+ * (its "Full name" label + "Save and continue" button + validation) is
+ * unchanged.
  */
 export default function RegisterPage() {
   const t = useTranslations('auth');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const locale = useLocale();
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">{t('registerTitle')}</h1>
-          <p className="mt-1 text-sm text-neutral-600">{t('registerSubtitle')}</p>
-        </div>
-
-        <RegisterForm onSaved={() => router.push(`/${locale}/home`)} />
-      </div>
-    </main>
+    <AuthShell
+      appName={tCommon('appName')}
+      title={t('registerTitle')}
+      subtitle={t('registerSubtitle')}
+    >
+      <RegisterForm onSaved={() => router.push(`/${locale}/home`)} />
+    </AuthShell>
   );
 }

@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { updateProfileSchema, type MeResponse, type UpdateProfileInput } from '@pg/types';
 import { useMe, useUpdateProfile } from '@pg/api-client';
 import { Alert, Button, ErrorState, Input, LoadingState, Toast } from '@pg/ui';
+import { ChevronDown } from 'lucide-react';
 
 import { useApiClient } from '../auth/api-client';
 
@@ -109,19 +110,30 @@ export function ProfileForm() {
           {...register('addressLine')}
         />
 
+        {/* Preferred language — a native <select> kept register-wired (not the
+            controlled @pg/ui Select, to avoid a Controller refactor), restyled
+            to the shared field recipe with a decorative ChevronDown overlay. */}
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="preferredLanguage" className="text-sm font-medium text-neutral-800">
+          <label htmlFor="preferredLanguage" className="text-sm font-medium text-neutral-600">
             {t('auth.languageLabel')}
           </label>
-          <select
-            id="preferredLanguage"
-            className="min-h-11 rounded-md border border-neutral-300 px-3 text-sm text-neutral-900"
-            data-testid="profile-language"
-            {...register('preferredLanguage')}
-          >
-            <option value="en">English</option>
-            <option value="ml">മലയാളം</option>
-          </select>
+          <div className="relative">
+            <select
+              id="preferredLanguage"
+              className="min-h-11 w-full appearance-none rounded-lg border border-neutral-200 bg-white pl-3 pr-9 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              data-testid="profile-language"
+              {...register('preferredLanguage')}
+            >
+              <option value="en">English</option>
+              <option value="ml">മലയാളം</option>
+            </select>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-400"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </span>
+          </div>
         </div>
 
         {updateProfile.isError && <Alert variant="error" title={t('auth.profileSaveFailed')} />}

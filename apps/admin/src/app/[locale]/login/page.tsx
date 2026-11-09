@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
+import { AuthShell } from '../../../components/AuthShell';
 import { LoginForm } from '../../../features/auth/LoginForm';
 
 /**
@@ -19,23 +20,26 @@ import { LoginForm } from '../../../features/auth/LoginForm';
  */
 export default function LoginPage() {
   const t = useTranslations('auth');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const locale = useLocale();
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6" data-testid="admin-login-page">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">{t('loginTitle')}</h1>
-          <p className="mt-1 text-sm text-neutral-600">{t('loginSubtitle')}</p>
-        </div>
-
-        <LoginForm
-          onRequested={(phone) =>
-            router.push(`/${locale}/verify?phone=${encodeURIComponent(phone)}`)
-          }
-        />
-      </div>
-    </main>
+    // Revamp P4a — centered auth layout via the shared admin `AuthShell`
+    // (mirrors citizen). The required `admin-login-page` testid is stamped
+    // onto the shell's `<main>` root via `rootProps` so admin-auth.spec +
+    // the RTL suite keep finding the page root exactly where they expect.
+    <AuthShell
+      appName={tCommon('appName')}
+      title={t('loginTitle')}
+      subtitle={t('loginSubtitle')}
+      rootProps={{ 'data-testid': 'admin-login-page' }}
+    >
+      <LoginForm
+        onRequested={(phone) =>
+          router.push(`/${locale}/verify?phone=${encodeURIComponent(phone)}`)
+        }
+      />
+    </AuthShell>
   );
 }

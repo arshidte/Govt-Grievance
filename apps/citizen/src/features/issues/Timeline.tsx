@@ -47,37 +47,56 @@ export function Timeline({ entries }: TimelineProps) {
   });
 
   return (
-    <ol className="flex flex-col gap-4">
-      {entries.map((entry) => {
+    <ol className="flex flex-col">
+      {entries.map((entry, index) => {
         const actorLabel =
           entry.actorRoleLabel !== null && isKnownRole(entry.actorRoleLabel)
             ? t(roleLabelKey(entry.actorRoleLabel))
             : null;
 
+        // The last row doesn't draw a trailing connector line below its dot.
+        const isLast = index === entries.length - 1;
+
         return (
+          // Revamp P3 — a rail-and-dot timeline: a small primary dot sits on a
+          // vertical connector in the left gutter, the entry content to its
+          // right. Pure styling — the from→to StatusBadge pair, note, time,
+          // and actor-role label (never PII) are unchanged.
           <li
             key={entry.id}
             data-testid="timeline-entry"
-            className="flex flex-col gap-1.5 border-l-2 border-neutral-200 pl-3"
+            className="relative flex gap-3 pb-5 last:pb-0"
           >
-            <div className="flex flex-wrap items-center gap-1.5">
-              <StatusBadge status={entry.fromStatus} t={t} />
-              <span aria-hidden="true" className="text-neutral-400">
-                →
-              </span>
-              <StatusBadge status={entry.toStatus} t={t} />
+            <div className="flex flex-col items-center">
+              <span
+                aria-hidden="true"
+                className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-primary-500 ring-4 ring-primary-50"
+              />
+              {!isLast && <span aria-hidden="true" className="mt-1 w-px flex-1 bg-neutral-200" />}
             </div>
 
-            {entry.note && <p className="text-sm text-neutral-700">{entry.note}</p>}
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge status={entry.fromStatus} t={t} />
+                <span aria-hidden="true" className="text-neutral-400">
+                  →
+                </span>
+                <StatusBadge status={entry.toStatus} t={t} />
+              </div>
 
-            <div className="flex items-center gap-2 text-xs text-neutral-500">
-              <time dateTime={entry.createdAt}>{dateFormatter.format(new Date(entry.createdAt))}</time>
-              <span aria-hidden="true">·</span>
-              {actorLabel !== null ? (
-                <span>{actorLabel}</span>
-              ) : (
-                <span data-testid="timeline-actor-neutral">{t('issues.timelineSystemActor')}</span>
-              )}
+              {entry.note && <p className="text-sm text-neutral-700">{entry.note}</p>}
+
+              <div className="flex items-center gap-2 text-xs text-neutral-500">
+                <time dateTime={entry.createdAt}>
+                  {dateFormatter.format(new Date(entry.createdAt))}
+                </time>
+                <span aria-hidden="true">·</span>
+                {actorLabel !== null ? (
+                  <span>{actorLabel}</span>
+                ) : (
+                  <span data-testid="timeline-actor-neutral">{t('issues.timelineSystemActor')}</span>
+                )}
+              </div>
             </div>
           </li>
         );

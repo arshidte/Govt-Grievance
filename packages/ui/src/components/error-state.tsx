@@ -38,14 +38,19 @@ export function ErrorState({
   ...props
 }: ErrorStateProps) {
   return (
+    // Revamp P2a — calm centered error view: the error glyph sits in a soft
+    // red tint chip (same-hue bg + stronger icon) so the failure reads
+    // without shouting; muted supporting copy, optional retry Button below.
     <div
       role="alert"
-      className={cn('flex flex-col items-center gap-3 rounded-lg px-6 py-12 text-center', className)}
+      className={cn('flex flex-col items-center gap-3 rounded-xl px-6 py-12 text-center', className)}
       {...props}
     >
-      <ErrorIcon className="h-10 w-10 text-status-escalated" />
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-status-escalated/10">
+        <ErrorIcon className="h-6 w-6 text-status-escalated" />
+      </span>
       <p className="text-base font-semibold text-neutral-900">{title}</p>
-      {description && <p className="max-w-sm text-sm text-neutral-600">{description}</p>}
+      {description && <p className="max-w-sm text-sm text-neutral-500">{description}</p>}
       {onRetry && (
         <Button className="mt-2" onClick={onRetry}>
           {retryLabel}

@@ -20,9 +20,5 @@ interface IssueDetailPageProps {
 export default async function IssueDetailPage({ params }: IssueDetailPageProps) {
   const { id } = await params;
 
-  return (
-    <div className="p-4">
-      <IssueDetail id={id} />
-    </div>
-  );
+  return <IssueDetail id={id} />;
 }

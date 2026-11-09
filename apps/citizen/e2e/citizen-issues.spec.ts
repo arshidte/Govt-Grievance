@@ -129,9 +129,9 @@ test.describe('citizen issues + notifications', () => {
 
     await loginNewCitizen(page, baseURL, phone);
 
-    // Navigate to the wizard via the bottom nav (confirms the nav item
-    // itself, not just the route).
-    await page.getByTestId('bottom-nav-report').click();
+    // Navigate to the wizard via the desktop sidebar nav (confirms the nav
+    // item itself, not just the route; the bottom nav is `lg:hidden` here).
+    await page.getByTestId('sidebar-nav-report').click();
     await expect(page).toHaveURL(/\/report$/);
     await expect(page.getByTestId('report-wizard')).toBeVisible();
 
@@ -164,8 +164,8 @@ test.describe('citizen issues + notifications', () => {
     const referenceNo = (await page.getByTestId('reference-number').textContent())?.trim() ?? '';
     expect(referenceNo).toMatch(/^GRV-\d{4}-\d{6}/);
 
-    // Dashboard: navigate via the bottom nav and find the just-created issue.
-    await page.getByTestId('bottom-nav-issues').click();
+    // Dashboard: navigate via the desktop sidebar nav and find the just-created issue.
+    await page.getByTestId('sidebar-nav-issues').click();
     await expect(page).toHaveURL(/\/issues$/);
     await expect(page.getByTestId('issues-dashboard')).toBeVisible();
 
@@ -186,11 +186,19 @@ test.describe('citizen issues + notifications', () => {
     // Notification + bell: the submission's `issue.submitted` notification
     // is written asynchronously, so poll via Playwright's auto-retrying
     // `expect` rather than asserting immediately.
-    await expect(page.getByTestId('notification-unread-count')).toBeVisible();
-    const unreadText = await page.getByTestId('notification-unread-count').textContent();
+    //
+    // The responsive shell renders a NotificationBell in BOTH the mobile
+    // `AppHeader` (`lg:hidden`) and the desktop `CitizenTopBar`
+    // (`hidden lg:flex`), so `notification-bell` / `notification-unread-count`
+    // each resolve to two DOM nodes. At this Desktop Chrome viewport only the
+    // top-bar one is visible, so scope to `citizen-topbar` — mirroring how the
+    // admin suite scopes `nav-link-*` to `admin-sidebar` vs `mobile-drawer`.
+    const topBar = page.getByTestId('citizen-topbar');
+    await expect(topBar.getByTestId('notification-unread-count')).toBeVisible();
+    const unreadText = await topBar.getByTestId('notification-unread-count').textContent();
     expect(Number(unreadText)).toBeGreaterThanOrEqual(1);
 
-    await page.getByTestId('notification-bell').click();
+    await topBar.getByTestId('notification-bell').click();
     await expect(page).toHaveURL(/\/notifications$/);
     await expect(page.getByTestId('notifications-list')).toBeVisible();
     await expect(page.getByTestId('notification-item').first()).toBeVisible();
@@ -201,13 +209,18 @@ test.describe('citizen issues + notifications', () => {
     // same bell).
     await page.getByTestId('notification-item').first().click();
     await expect(page).toHaveURL(/\/issues\/[^/]+$/);
-    await expect(page.getByTestId('notification-unread-count')).toHaveCount(0);
+    // Scoped to the visible top bar (the badge also exists in the hidden
+    // mobile header); after mark-read the unread badge is gone entirely.
+    await expect(topBar.getByTestId('notification-unread-count')).toHaveCount(0);
 
     // en -> ml toggle: switch locale via the LanguageSwitcher and confirm
     // the issues dashboard heading renders in Malayalam.
-    await page.getByTestId('bottom-nav-issues').click();
+    await page.getByTestId('sidebar-nav-issues').click();
     await expect(page).toHaveURL(/\/issues$/);
     await page.getByRole('radio', { name: 'ML' }).click();
-    await expect(page.getByRole('heading', { name: 'നിങ്ങളുടെ പരാതികൾ' })).toBeVisible();
+    // Revamp reworded the dashboard heading "Your grievances" → "My
+    // grievances" (issues.dashboardTitle, both locales); assert the current
+    // Malayalam copy — the check still verifies the ML heading renders.
+    await expect(page.getByRole('heading', { name: 'എന്റെ പരാതികൾ' })).toBeVisible();
   });
 });

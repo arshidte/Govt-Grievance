@@ -144,7 +144,9 @@ async function registerCitizenAndSubmitWardOneIssue(
   await cz.getByRole('button', { name: 'Save and continue' }).click();
   await expect(cz).toHaveURL(/\/home$/);
 
-  await cz.getByTestId('bottom-nav-report').click();
+  // Desktop Chrome viewport: the citizen bottom nav is `lg:hidden`, so drive
+  // the persistent sidebar nav (same keys) instead.
+  await cz.getByTestId('sidebar-nav-report').click();
   await expect(cz).toHaveURL(/\/report$/);
   await expect(cz.getByTestId('report-wizard')).toBeVisible();
 
@@ -174,7 +176,7 @@ async function registerCitizenAndSubmitWardOneIssue(
 
   // Navigate to the dashboard and into the issue's own detail page, purely
   // to capture its id (from the URL) for Test 2's direct-navigation check.
-  await cz.getByTestId('bottom-nav-issues').click();
+  await cz.getByTestId('sidebar-nav-issues').click();
   await expect(cz).toHaveURL(/\/issues$/);
   const issueCard = cz.getByTestId('issue-card').filter({ hasText: referenceNo });
   await expect(issueCard).toHaveCount(1);
@@ -231,7 +233,13 @@ test.describe('cross-app: staff UI status transition reaches the citizen', () =>
       await st.goto(`${ADMIN}/en/issues`);
       await expect(st.getByTestId('admin-issues-page')).toBeVisible();
 
-      const staffItem = st.getByTestId('staff-issue-item').filter({ hasText: referenceNo });
+      // The triage list renders both a desktop table and mobile cards (same
+      // `staff-issue-item` testids in each); at this Desktop Chrome viewport
+      // scope to the visible `staff-issue-table` so the row resolves once.
+      const staffItem = st
+        .getByTestId('staff-issue-table')
+        .getByTestId('staff-issue-item')
+        .filter({ hasText: referenceNo });
       await expect(staffItem).toHaveCount(1);
       await staffItem.getByTestId('staff-issue-item-link').click();
       await expect(st.getByTestId('staff-issue-detail')).toBeVisible();
@@ -259,11 +267,17 @@ test.describe('cross-app: staff UI status transition reaches the citizen', () =>
       // The async `issue.status_changed` notification (outbox/worker) is not
       // synchronous with the transition response — poll via Playwright's
       // auto-retrying `expect`.
-      await expect(cz.getByTestId('notification-unread-count')).toBeVisible();
-      const unreadText = await cz.getByTestId('notification-unread-count').textContent();
+      //
+      // The responsive citizen shell renders the NotificationBell in both the
+      // mobile `AppHeader` and the desktop `CitizenTopBar`, so the bell/unread
+      // testids resolve to two nodes; at this Desktop Chrome viewport scope to
+      // the visible `citizen-topbar`.
+      const czTopBar = cz.getByTestId('citizen-topbar');
+      await expect(czTopBar.getByTestId('notification-unread-count')).toBeVisible();
+      const unreadText = await czTopBar.getByTestId('notification-unread-count').textContent();
       expect(Number(unreadText)).toBeGreaterThanOrEqual(1);
 
-      await cz.getByTestId('notification-bell').click();
+      await czTopBar.getByTestId('notification-bell').click();
       await expect(cz).toHaveURL(/\/notifications$/);
       await expect(cz.getByTestId('notifications-list')).toBeVisible();
       await expect(cz.getByTestId('notification-item').first()).toBeVisible();
@@ -290,8 +304,11 @@ test.describe('cross-app: out-of-scope staff cannot see or transition the issue'
       await expect(st.getByTestId('admin-issues-page')).toBeVisible();
 
       // The server-scoped list simply omits it — no item for this reference
-      // number anywhere on the triage surface.
-      await expect(st.getByTestId('staff-issue-item').filter({ hasText: referenceNo })).toHaveCount(0);
+      // number anywhere on the triage surface (scoped to the desktop table,
+      // consistent with the in-scope assertion above).
+      await expect(
+        st.getByTestId('staff-issue-table').getByTestId('staff-issue-item').filter({ hasText: referenceNo }),
+      ).toHaveCount(0);
 
       // A direct detail-URL visit (same issue id, derived from the citizen's
       // own detail URL) gets the clean, non-disclosing not-found state —

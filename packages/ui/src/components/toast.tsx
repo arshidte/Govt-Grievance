@@ -37,11 +37,23 @@ export function ToastProvider({ children, viewportClassName, ...props }: ToastPr
   );
 }
 
+// Revamp P2a — a toast is a genuinely floating surface, so it keeps a soft
+// shadow (shadow-sm) over a clean white-ish tint. Matching the Alert
+// treatment: subtle same-hue frame + a stronger colored left accent rail +
+// a colored icon, so the variant reads without relying on color alone.
 const variantClasses: Record<ToastVariant, string> = {
-  info: 'border-primary-200 bg-primary-50 text-primary-900',
-  success: 'border-status-resolved bg-green-50 text-green-900',
-  warning: 'border-status-inProgress bg-amber-50 text-amber-900',
-  error: 'border-status-escalated bg-red-50 text-red-900',
+  info: 'border-primary-200 border-l-primary-500 bg-primary-50 text-primary-900',
+  success: 'border-green-200 border-l-status-resolved bg-green-50 text-green-900',
+  warning: 'border-amber-200 border-l-status-inProgress bg-amber-50 text-amber-900',
+  error: 'border-red-200 border-l-status-escalated bg-red-50 text-red-900',
+};
+
+// Icon tint per variant — stronger hue than the text, anchoring the toast.
+const iconClasses: Record<ToastVariant, string> = {
+  info: 'text-primary-600',
+  success: 'text-status-resolved',
+  warning: 'text-status-inProgress',
+  error: 'text-status-escalated',
 };
 
 function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -123,13 +135,13 @@ export const Toast = React.forwardRef<HTMLLIElement, ToastProps>(
       <ToastPrimitive.Root
         ref={ref}
         className={cn(
-          'flex items-start gap-3 rounded-md border p-4 shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'flex items-start gap-3 rounded-lg border border-l-4 p-4 shadow-sm data-[state=open]:animate-in data-[state=closed]:animate-out',
           variantClasses[variant],
           className,
         )}
         {...props}
       >
-        <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
+        <Icon className={cn('mt-0.5 h-5 w-5 flex-shrink-0', iconClasses[variant])} />
         <div className="flex flex-1 flex-col gap-0.5">
           <ToastPrimitive.Title className="text-sm font-medium">{title}</ToastPrimitive.Title>
           {description && (

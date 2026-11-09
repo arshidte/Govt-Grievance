@@ -65,6 +65,23 @@ export const priority = {
   urgent: '#b91c1c', // red-700
 } as const;
 
+/**
+ * Semantic surface aliases (revamp P2a). These are NOT a new palette — each
+ * maps to an existing `neutral`/`white` value so the design spec's vocabulary
+ * (canvas / surface / border) has a token home without hardcoding. Additive
+ * and backward-compatible: nothing references these by key yet, and no
+ * existing key was renamed/removed. Surfaced in the preset as `colors.surface`
+ * (e.g. `bg-surface-canvas`, `border-surface-border`).
+ */
+export const surface = {
+  /** Page background (calm neutral canvas). */
+  canvas: neutral[50],
+  /** Card/panel background. */
+  panel: '#ffffff',
+  /** Default border / divider hairline. */
+  border: neutral[200],
+} as const;
+
 /** Spacing scale (rem-based, 4px grid). */
 export const spacing = {
   0: '0px',
@@ -136,6 +153,7 @@ export const tokens = {
   neutral,
   status,
   priority,
+  surface,
   spacing,
   radius,
   shadow,

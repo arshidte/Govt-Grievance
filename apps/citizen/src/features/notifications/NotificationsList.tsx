@@ -2,8 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
+import type { ComponentType } from 'react';
 import type { NotificationDTO } from '@pg/types';
 import { EmptyState, ErrorState, LoadingState } from '@pg/ui';
+import { Bell, FilePlus2, RefreshCw } from 'lucide-react';
 
 import { useMarkReadMutation, useNotificationsQuery } from './useNotifications';
 
@@ -27,6 +29,24 @@ function messageKeyForType(type: string): string {
   }
 }
 
+/**
+ * Maps a `NotificationDTO.type` to its leading lucide icon — a per-type
+ * visual cue alongside the message. Mirrors `messageKeyForType`'s defensive
+ * fallback: an unknown/future type gets a generic `Bell` rather than throwing.
+ * Purely presentational (no color meaning carried here — read/unread is the
+ * only status cue and that lives on the row, with its text label).
+ */
+function iconForType(type: string): ComponentType<{ className?: string }> {
+  switch (type) {
+    case 'issue.submitted':
+      return FilePlus2;
+    case 'issue.status_changed':
+      return RefreshCw;
+    default:
+      return Bell;
+  }
+}
+
 interface NotificationRowProps {
   notification: NotificationDTO;
   dateFormatter: Intl.DateTimeFormat;
@@ -36,6 +56,7 @@ interface NotificationRowProps {
 function NotificationRow({ notification, dateFormatter, onActivate }: NotificationRowProps) {
   const t = useTranslations();
   const isUnread = notification.readAt === null;
+  const Icon = iconForType(notification.type);
 
   return (
     <button
@@ -44,25 +65,45 @@ function NotificationRow({ notification, dateFormatter, onActivate }: Notificati
       data-testid="notification-item"
       data-unread={isUnread}
       className={[
-        'flex w-full flex-col items-start gap-1 rounded-lg border border-neutral-200 px-4 py-3 text-left',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-        isUnread ? 'bg-primary-50' : 'bg-white',
+        // Row: a leading type icon + message/timestamp column + unread cue.
+        // Unread rows get a subtle left accent rail (border-l-4) + a tinted
+        // surface + stronger text; read rows sit flat on white. Hover/focus
+        // affordances make the whole row feel actionable.
+        'flex w-full items-start gap-3 rounded-xl border border-l-4 px-4 py-3 text-left transition-colors',
+        'hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+        isUnread
+          ? 'border-neutral-200 border-l-primary-600 bg-primary-50 hover:bg-primary-50'
+          : 'border-neutral-200 border-l-transparent bg-white',
       ].join(' ')}
     >
-      <div className="flex w-full items-start justify-between gap-2">
-        <p className={isUnread ? 'text-sm font-semibold text-neutral-900' : 'text-sm font-normal text-neutral-700'}>
-          {t(messageKeyForType(notification.type))}
-        </p>
-        {/* Unread state is conveyed via BOTH a visual dot AND this text
-            label — never color/boldness alone (WCAG 1.4.1). */}
-        {isUnread && (
-          <span className="flex items-center gap-1 text-xs font-medium text-primary-700">
-            <span className="h-2 w-2 rounded-full bg-primary-600" aria-hidden="true" />
-            {t('notifications.unreadLabel')}
-          </span>
-        )}
+      {/* Leading type icon in a soft chip — unread tints it brand, read stays
+          neutral. Decorative: the message text carries the real meaning. */}
+      <span
+        aria-hidden="true"
+        className={[
+          'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+          isUnread ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500',
+        ].join(' ')}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex w-full items-start justify-between gap-2">
+          <p className={isUnread ? 'text-sm font-semibold text-neutral-900' : 'text-sm font-normal text-neutral-700'}>
+            {t(messageKeyForType(notification.type))}
+          </p>
+          {/* Unread state is conveyed via BOTH a visual dot AND this text
+              label — never color/boldness alone (WCAG 1.4.1). */}
+          {isUnread && (
+            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary-700">
+              <span className="h-2 w-2 rounded-full bg-primary-600" aria-hidden="true" />
+              {t('notifications.unreadLabel')}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-neutral-500">{dateFormatter.format(new Date(notification.createdAt))}</span>
       </div>
-      <span className="text-xs text-neutral-500">{dateFormatter.format(new Date(notification.createdAt))}</span>
     </button>
   );
 }

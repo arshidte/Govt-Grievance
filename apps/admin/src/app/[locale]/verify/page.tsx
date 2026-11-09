@@ -4,6 +4,7 @@ import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
+import { AuthShell } from '../../../components/AuthShell';
 import { VerifyForm } from '../../../features/auth/VerifyForm';
 
 /**
@@ -28,6 +29,7 @@ import { VerifyForm } from '../../../features/auth/VerifyForm';
  */
 function VerifyPageContent() {
   const t = useTranslations('auth');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const locale = useLocale();
   const searchParams = useSearchParams();
@@ -44,17 +46,17 @@ function VerifyPageContent() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <h1 className="text-xl font-semibold text-neutral-900">{t('verifyTitle')}</h1>
-
-        <VerifyForm
-          phone={phone}
-          onChangeNumber={() => router.push(`/${locale}/login`)}
-          onVerified={() => router.push(`/${locale}/`)}
-        />
-      </div>
-    </main>
+    // Revamp P4a — centered auth layout via the shared admin `AuthShell`.
+    // The OTP cells (and their "Digit N of 6" aria-labels), the change-number
+    // action, and the exact verify->dashboard navigation below all stay in
+    // `VerifyForm`/this callback, unchanged — only the surrounding chrome moved.
+    <AuthShell appName={tCommon('appName')} title={t('verifyTitle')}>
+      <VerifyForm
+        phone={phone}
+        onChangeNumber={() => router.push(`/${locale}/login`)}
+        onVerified={() => router.push(`/${locale}/`)}
+      />
+    </AuthShell>
   );
 }
 

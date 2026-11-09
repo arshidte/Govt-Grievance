@@ -38,14 +38,19 @@ export function ForbiddenState({
   ...props
 }: ForbiddenStateProps) {
   return (
+    // Revamp P2a — calm centered 403 view: lock glyph in a soft red tint chip
+    // (same-hue bg + stronger icon), matching ErrorState's treatment so the
+    // state family reads consistently; muted supporting copy.
     <div
       role="alert"
-      className={cn('flex flex-col items-center gap-3 rounded-lg px-6 py-12 text-center', className)}
+      className={cn('flex flex-col items-center gap-3 rounded-xl px-6 py-12 text-center', className)}
       {...props}
     >
-      <LockIcon className="h-10 w-10 text-status-escalated" />
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-status-escalated/10">
+        <LockIcon className="h-6 w-6 text-status-escalated" />
+      </span>
       <p className="text-base font-semibold text-neutral-900">{title}</p>
-      <p className="max-w-sm text-sm text-neutral-600">{description}</p>
+      <p className="max-w-sm text-sm text-neutral-500">{description}</p>
       {actionLabel && onAction && (
         <Button className="mt-2" onClick={onAction}>
           {actionLabel}

@@ -141,18 +141,24 @@ const STATUS_DESCRIPTORS: Record<
   REOPENED: { tokenKey: 'reopened', Icon: RefreshIcon },
 };
 
-/** Tailwind classes keyed by the same token key — generated from the T19 `status.*` preset colors. */
+/**
+ * Tailwind classes keyed by the same token key — generated from the T19
+ * `status.*` preset colors. Revamp P2a: soft tinted pill = light same-hue
+ * bg tint (`/10`) + a faint same-hue ring (`/20`) for crisp definition +
+ * full-strength same-hue text. The icon + text still carry the meaning
+ * (never color alone).
+ */
 const colorClasses: Record<string, string> = {
-  submitted: 'bg-status-submitted/10 text-status-submitted',
-  acknowledged: 'bg-status-acknowledged/10 text-status-acknowledged',
-  underReview: 'bg-status-underReview/10 text-status-underReview',
-  assigned: 'bg-status-assigned/10 text-status-assigned',
-  inProgress: 'bg-status-inProgress/10 text-status-inProgress',
-  waitingForInformation: 'bg-status-waitingForInformation/10 text-status-waitingForInformation',
-  escalated: 'bg-status-escalated/10 text-status-escalated',
-  resolved: 'bg-status-resolved/10 text-status-resolved',
-  closed: 'bg-status-closed/10 text-status-closed',
-  reopened: 'bg-status-reopened/10 text-status-reopened',
+  submitted: 'bg-status-submitted/10 text-status-submitted ring-1 ring-inset ring-status-submitted/20',
+  acknowledged: 'bg-status-acknowledged/10 text-status-acknowledged ring-1 ring-inset ring-status-acknowledged/20',
+  underReview: 'bg-status-underReview/10 text-status-underReview ring-1 ring-inset ring-status-underReview/20',
+  assigned: 'bg-status-assigned/10 text-status-assigned ring-1 ring-inset ring-status-assigned/20',
+  inProgress: 'bg-status-inProgress/10 text-status-inProgress ring-1 ring-inset ring-status-inProgress/20',
+  waitingForInformation: 'bg-status-waitingForInformation/10 text-status-waitingForInformation ring-1 ring-inset ring-status-waitingForInformation/20',
+  escalated: 'bg-status-escalated/10 text-status-escalated ring-1 ring-inset ring-status-escalated/20',
+  resolved: 'bg-status-resolved/10 text-status-resolved ring-1 ring-inset ring-status-resolved/20',
+  closed: 'bg-status-closed/10 text-status-closed ring-1 ring-inset ring-status-closed/20',
+  reopened: 'bg-status-reopened/10 text-status-reopened ring-1 ring-inset ring-status-reopened/20',
 };
 
 /**

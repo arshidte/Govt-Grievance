@@ -32,16 +32,25 @@ export interface ButtonProps
  * buttons comfortably sized without a fixed min-width.
  */
 const base =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium ' +
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium ' +
   'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ' +
   'focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none';
 
+// Revamp P2a — modern SaaS button set:
+//  - primary: solid brand fill, the single strongest emphasis per surface.
+//  - secondary: calm white surface with a hairline border (bg-white +
+//    border-neutral-200), hover lifts to neutral-50 — reads as a quiet,
+//    bordered action next to a solid primary rather than a gray slab.
+//  - ghost: chromeless until hover (neutral-100), for low-emphasis actions.
+//  - destructive: solid escalated-red fill; darker red on hover/active for
+//    affordance (raw red-700/800 from Tailwind's default scale, consistent
+//    with the Alert/Toast error tints already in use here).
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800',
   secondary:
-    'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 active:bg-neutral-300',
-  ghost: 'bg-transparent text-neutral-900 hover:bg-neutral-100 active:bg-neutral-200',
-  destructive: 'bg-status-escalated text-white hover:bg-red-800 active:bg-red-900',
+    'border border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50 active:bg-neutral-100',
+  ghost: 'bg-transparent text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200',
+  destructive: 'bg-status-escalated text-white hover:bg-red-700 active:bg-red-800',
 };
 
 function Spinner() {

@@ -29,14 +29,19 @@ function InboxIcon(props: React.SVGProps<SVGSVGElement>) {
  */
 export function EmptyState({ title, description, action, className, ...props }: EmptyStateProps) {
   return (
+    // Revamp P2a — calm centered empty view: the icon sits in a soft neutral
+    // chip (rounded-full tint) for a modern, deliberate look rather than a
+    // bare glyph; generous vertical rhythm, muted supporting copy.
     <div
       role="status"
-      className={cn('flex flex-col items-center gap-3 rounded-lg px-6 py-12 text-center', className)}
+      className={cn('flex flex-col items-center gap-3 rounded-xl px-6 py-12 text-center', className)}
       {...props}
     >
-      <InboxIcon className="h-10 w-10 text-neutral-400" />
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
+        <InboxIcon className="h-6 w-6 text-neutral-400" />
+      </span>
       <p className="text-base font-semibold text-neutral-900">{title}</p>
-      <p className="max-w-sm text-sm text-neutral-600">{description}</p>
+      <p className="max-w-sm text-sm text-neutral-500">{description}</p>
       {action && (
         <Button className="mt-2" onClick={action.onClick}>
           {action.label}

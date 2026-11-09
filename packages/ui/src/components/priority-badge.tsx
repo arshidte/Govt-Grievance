@@ -69,12 +69,17 @@ const PRIORITY_DESCRIPTORS: Record<
   URGENT: { tokenKey: 'urgent', Icon: AlertOctagonIcon },
 };
 
-/** Tailwind classes keyed by the same token key — generated from the T19 `priority.*` preset colors. */
+/**
+ * Tailwind classes keyed by the same token key — generated from the T19
+ * `priority.*` preset colors. Revamp P2a: soft tinted pill = light same-hue
+ * bg tint (`/10`) + a faint same-hue ring (`/20`) for definition +
+ * full-strength same-hue text. Icon + text still carry the meaning.
+ */
 const colorClasses: Record<string, string> = {
-  low: 'bg-priority-low/10 text-priority-low',
-  medium: 'bg-priority-medium/10 text-priority-medium',
-  high: 'bg-priority-high/10 text-priority-high',
-  urgent: 'bg-priority-urgent/10 text-priority-urgent',
+  low: 'bg-priority-low/10 text-priority-low ring-1 ring-inset ring-priority-low/20',
+  medium: 'bg-priority-medium/10 text-priority-medium ring-1 ring-inset ring-priority-medium/20',
+  high: 'bg-priority-high/10 text-priority-high ring-1 ring-inset ring-priority-high/20',
+  urgent: 'bg-priority-urgent/10 text-priority-urgent ring-1 ring-inset ring-priority-urgent/20',
 };
 
 /**
