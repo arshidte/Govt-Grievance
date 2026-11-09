@@ -1,27 +1,9 @@
-import { getTranslations } from 'next-intl/server';
-import { ModulePage } from '../../../../components/ModulePage';
+import { RepresentativesManager } from '../../../../features/org/representatives/RepresentativesManager';
 
 /**
- * Placeholder shell for the representatives module (M2+ scope — see ModulePage.tsx).
- * Reached only once the `(app)` layout's staff gate + shell have passed;
- * this page itself does no auth work.
+ * Admin Representatives management (org-management milestone — replaces the
+ * `ModulePage` placeholder). Staff gate + admin-only server enforcement apply.
  */
-export default async function RepresentativesPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  const [tNav, tModules] = await Promise.all([
-    getTranslations({ locale, namespace: 'nav' }),
-    getTranslations({ locale, namespace: 'admin.modules' }),
-  ]);
-
-  return (
-    <ModulePage
-      title={tNav('representatives')}
-      description={tModules('representativesDescription')}
-      testId="admin-representatives-page"
-    />
-  );
+export default function RepresentativesPage() {
+  return <RepresentativesManager />;
 }

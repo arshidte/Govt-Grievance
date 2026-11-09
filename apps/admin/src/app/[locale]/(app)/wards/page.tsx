@@ -1,27 +1,17 @@
-import { getTranslations } from 'next-intl/server';
-import { ModulePage } from '../../../../components/ModulePage';
+import { Suspense } from 'react';
+
+import { WardsManager } from '../../../../features/org/wards/WardsManager';
 
 /**
- * Placeholder shell for the wards module (M2+ scope — see ModulePage.tsx).
- * Reached only once the `(app)` layout's staff gate + shell have passed;
- * this page itself does no auth work.
+ * Admin Wards management (org-management milestone — replaces the `ModulePage`
+ * placeholder). `WardsManager` reads `?panchayatId=` via `useSearchParams`,
+ * so it is wrapped in a Suspense boundary (Next 15 requirement). Staff gate +
+ * admin-only server enforcement apply as for every org module.
  */
-export default async function WardsPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  const [tNav, tModules] = await Promise.all([
-    getTranslations({ locale, namespace: 'nav' }),
-    getTranslations({ locale, namespace: 'admin.modules' }),
-  ]);
-
+export default function WardsPage() {
   return (
-    <ModulePage
-      title={tNav('wards')}
-      description={tModules('wardsDescription')}
-      testId="admin-wards-page"
-    />
+    <Suspense fallback={null}>
+      <WardsManager />
+    </Suspense>
   );
 }
