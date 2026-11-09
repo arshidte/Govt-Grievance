@@ -63,10 +63,10 @@ const PANCHAYATS: PanchayatDTO[] = [
 
 const WARDS_BY_PANCHAYAT: Record<string, WardDTO[]> = {
   'pan-1': [
-    { id: 'ward-1a', number: 1, name: 'Ward 1A', nameMl: 'വാർഡ് 1A', panchayatId: 'pan-1' },
-    { id: 'ward-1b', number: 2, name: 'Ward 1B', nameMl: 'വാർഡ് 1B', panchayatId: 'pan-1' },
+    { id: 'ward-1a', number: 1, name: 'Ward 1A', nameMl: 'വാർഡ് 1A', panchayatId: 'pan-1' , status: 'active' },
+    { id: 'ward-1b', number: 2, name: 'Ward 1B', nameMl: 'വാർഡ് 1B', panchayatId: 'pan-1' , status: 'active' },
   ],
-  'pan-2': [{ id: 'ward-2a', number: 1, name: 'Ward 2A', nameMl: 'വാർഡ് 2A', panchayatId: 'pan-2' }],
+  'pan-2': [{ id: 'ward-2a', number: 1, name: 'Ward 2A', nameMl: 'വാർഡ് 2A', panchayatId: 'pan-2' , status: 'active' }],
 };
 
 const CREATED_ISSUE: IssueDetailDTO = {
