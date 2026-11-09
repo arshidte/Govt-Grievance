@@ -28,8 +28,12 @@ Decisions: subagent-driven phase-by-phase; Citizen = responsive desktop sidebar 
 ## Phase 5 — Responsive + quality
 - [x] Full UI gate GREEN: `turbo run lint typecheck test build` across @pg/ui + @pg/citizen + @pg/admin + @pg/i18n → 11/11 tasks successful. (@pg/api untouched; already CI-verified.)
 - [x] Playwright nav migration DONE: citizen suite runs at Desktop Chrome (≥lg) where bottom-nav is `lg:hidden`, so the 5 `bottom-nav-*` clicks → `sidebar-nav-*` (citizen-auth: profile; citizen-issues: report/issues/issues; admin-issues `cz`: report/issues). Verified sidebar-nav-<key> testids exist + active→aria-current wired; comments updated. `playwright test --list` parses both suites: 2 citizen + 8 admin tests intact. NO assertion weakened (same flows, correct nav for the viewport).
-- [ ] e2e RUN blocked: needs Postgres on :5435 (webServer migrates+seeds+builds API+app). Docker daemon is DOWN locally → cannot execute `pnpm test:e2e` here. ASK USER to start Docker Desktop (then `docker compose -f docker-compose.dev.yml up -d` + `pnpm test:e2e`), or I run it once the daemon is up. Also runs in CI on the eventual PR.
-- [~] Responsive/states/a11y/en-ml applied per-phase via design-language (sidebar+drawer+bottom-nav, LoadingState/EmptyState/ErrorState, aria-current/role=alert/labels, all new strings en+ml parity-enforced). Final holistic pass pending the live e2e run.
+- [x] e2e RUN GREEN (Docker up, Postgres :5435): **citizen 2/2, admin 8/8**. Fixed 3 responsive-duplicate-testid issues the live run surfaced (all = same class: a testid rendered in BOTH mobile+desktop shells, `getByTestId` matches display:none DOM nodes):
+    1. Citizen NotificationBell renders in AppHeader (mobile) + CitizenTopBar (desktop) → `notification-bell`/`notification-unread-count` ×2. Scoped citizen-issues + admin-issues `cz` assertions to `citizen-topbar` (matches admin nav's sidebar-vs-drawer scoping precedent). (getByRole ML-radio needed no change — a11y tree excludes display:none.)
+    2. Triage list renders desktop `<table>` + mobile cards, both `staff-issue-item`/`-link` → ×2. Added container testids `staff-issue-table`/`staff-issue-cards` to StaffIssueList; scoped both admin-issues `staff-issue-item` queries to `staff-issue-table`.
+    3. Revamp reworded `issues.dashboardTitle` "Your grievances"→"My grievances" (en+ml) — updated citizen-issues ML heading assertion to current copy `എന്റെ പരാതികൾ` (intent = verify ML renders, preserved).
+  All justified (correct nav/layout for the viewport; same flows; no coverage removed). admin 64 unit + typecheck + lint(0) still green.
+- [~] Responsive/states/a11y/en-ml applied per-phase via design-language (sidebar+drawer+bottom-nav, LoadingState/EmptyState/ErrorState, aria-current/role=alert/labels, all new strings en+ml parity-enforced); now corroborated by the green cross-viewport e2e. --- REVAMP CODE-COMPLETE; awaiting merge approval ---
 
 ## Log
 (append per-unit results here)

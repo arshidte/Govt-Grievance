@@ -69,8 +69,16 @@ export function StaffIssueList() {
         // that holds BOTH presentations — the Playwright scopes its row/link
         // queries under this id regardless of which viewport is rendered.
         <div data-testid="staff-issue-list">
-          {/* Desktop (md+): a scannable, bordered table. Hidden on mobile. */}
-          <div className="hidden overflow-hidden rounded-xl border border-neutral-200 bg-white md:block">
+          {/* Desktop (md+): a scannable, bordered table. Hidden on mobile.
+              The desktop/mobile layouts render the SAME rows (same
+              `staff-issue-item`/`staff-issue-item-link` testids), so each issue
+              is in the DOM twice; these container testids let a test scope to
+              the layout visible at its viewport (mirrors admin nav's
+              sidebar-vs-drawer scoping). */}
+          <div
+            data-testid="staff-issue-table"
+            className="hidden overflow-hidden rounded-xl border border-neutral-200 bg-white md:block"
+          >
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50 text-xs font-medium uppercase tracking-wide text-neutral-500">
@@ -106,7 +114,7 @@ export function StaffIssueList() {
           </div>
 
           {/* Mobile (< md): the SAME data as stacked cards. Hidden on md+. */}
-          <div className="flex flex-col gap-3 md:hidden">
+          <div data-testid="staff-issue-cards" className="flex flex-col gap-3 md:hidden">
             {issues.data.map((issue) => (
               <IssueMobileCard
                 key={issue.id}
