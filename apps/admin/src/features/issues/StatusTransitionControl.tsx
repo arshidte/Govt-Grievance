@@ -96,22 +96,26 @@ export function StatusTransitionControl({ issue }: StatusTransitionControlProps)
   };
 
   return (
+    // Revamp P4b — the bordered panel moved UP to the parent `Card` wrapping
+    // this control, so the form itself is now a plain flex column. Markup/
+    // testids/logic are otherwise unchanged; only the surrounding chrome and
+    // the input chrome were restyled to the design-language tokens.
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-md border border-neutral-200 p-4"
+      className="flex flex-col gap-4"
       data-testid="status-transition-control"
     >
       <h2 className="text-base font-semibold text-neutral-900">{t('transitionTitle')}</h2>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-neutral-800">{t('transitionTargetLabel')}</span>
+        <span className="text-sm font-medium text-neutral-600">{t('transitionTargetLabel')}</span>
         <div data-testid="transition-target">
           <StatusBadge status={nextStatus} t={tRoot} />
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="transition-note" className="text-sm font-medium text-neutral-800">
+        <label htmlFor="transition-note" className="text-sm font-medium text-neutral-600">
           {t('transitionNoteLabel')}
           <span aria-hidden="true" className="text-status-escalated"> *</span>
         </label>
@@ -123,7 +127,7 @@ export function StatusTransitionControl({ issue }: StatusTransitionControlProps)
           maxLength={MAX_NOTE_LENGTH}
           required
           rows={3}
-          className="min-h-11 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <p className="text-sm text-neutral-500">{t('transitionNoteHint')}</p>
       </div>
@@ -134,7 +138,7 @@ export function StatusTransitionControl({ issue }: StatusTransitionControlProps)
         </Alert>
       )}
 
-      <Button type="submit" disabled={!canSubmit} loading={transition.isPending} data-testid="transition-submit">
+      <Button type="submit" disabled={!canSubmit} loading={transition.isPending} data-testid="transition-submit" className="self-start">
         {transition.isPending ? t('transitionSubmitting') : t('transitionSubmit')}
       </Button>
     </form>
