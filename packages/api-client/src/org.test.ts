@@ -25,6 +25,7 @@ const ward: WardDTO = {
   name: 'Ward 1',
   nameMl: 'വാർഡ് 1',
   panchayatId: 'p1',
+  status: 'active',
 };
 
 describe('createApiClient — org reads', () => {
