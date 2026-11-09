@@ -95,7 +95,14 @@ export class SessionService {
 
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },
-      include: { user: { include: { roleAssignments: true } } },
+      // Attach only ACTIVE role assignments (org-management milestone):
+      // a soft-revoked assignment (`revokedAt` set) must no longer grant any
+      // authorization. Filtering here — the single place `req.user` is built —
+      // makes revocation take effect uniformly across issue-scope checks,
+      // on-behalf submission, and the admin surfaces, without each call site
+      // re-filtering. Pre-milestone rows have `revokedAt = NULL` (active), so
+      // existing M1/M2 behavior is unchanged.
+      include: { user: { include: { roleAssignments: { where: { revokedAt: null } } } } },
     });
 
     if (!session) {
