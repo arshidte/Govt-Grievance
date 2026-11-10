@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AccessModule } from './access/access.module';
+import { AuditQueryModule } from './audit/audit-query.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -50,6 +51,7 @@ const conditionalModules = env.NODE_ENV === 'production' ? [] : [DevModule];
     PrismaModule,
     AuthModule,
     AccessModule,
+    AuditQueryModule,
     AttachmentsModule,
     CatalogModule,
     IssuesModule,

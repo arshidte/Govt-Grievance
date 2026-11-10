@@ -311,6 +311,11 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorUserId, createdAt])
+  // Supports the audit-log viewer's universal ordering (`createdAt DESC,
+  // id DESC`), its `from`/`to` range scans, and the compound keyset cursor
+  // (M4A). A composite on exactly the sort keys lets Postgres satisfy the
+  // ORDER BY + pagination from an index scan instead of a sort.
+  @@index([createdAt, id])
 }
 
 // Admin-initiated staff onboarding (staff-onboarding milestone). Holds the
