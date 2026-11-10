@@ -487,6 +487,42 @@
         "cancelled": "Cancelled",
         "expired": "Expired"
       }
+    },
+    "auditLogs": {
+      "title": "Audit logs",
+      "subtitle": "Browse administrative audit events.",
+      "none": "—",
+      "colTimestamp": "Timestamp",
+      "colAction": "Action",
+      "colEntityType": "Entity type",
+      "colEntityId": "Entity ID",
+      "colActor": "Actor user ID",
+      "filterAction": "Action",
+      "filterActionPlaceholder": "e.g. panchayat.created",
+      "filterEntityType": "Entity type",
+      "filterEntityTypePlaceholder": "e.g. Panchayat",
+      "filterEntityId": "Entity ID",
+      "filterEntityIdPlaceholder": "Exact ID",
+      "filterActor": "Actor user ID",
+      "filterActorPlaceholder": "Exact user ID",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "apply": "Apply",
+      "reset": "Reset",
+      "forbiddenTitle": "Admins only",
+      "forbiddenDescription": "Audit logs are visible to Global Admins only.",
+      "errorTitle": "Couldn't load audit logs",
+      "errorDescription": "Something went wrong while loading the audit logs.",
+      "retry": "Try again",
+      "emptyTitle": "No audit events",
+      "emptyDescription": "No audit events match these filters.",
+      "tableCaption": "Audit events",
+      "prev": "Previous",
+      "next": "Next",
+      "pageN": "Page {n}",
+      "detailTitle": "Audit event",
+      "metadataLabel": "Metadata",
+      "noMetadata": "No metadata"
     }
   }
 }
