@@ -7,3 +7,4 @@ export * from './onboarding';
 export * from './category';
 export * from './issue';
 export * from './notification';
+export * from './audit';
