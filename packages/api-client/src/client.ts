@@ -2,6 +2,8 @@ import type {
   AssignCoordinatorInput,
   AssignRepresentativeInput,
   AttachmentDTO,
+  AuditLogListParams,
+  AuditLogPageDTO,
   CategoryDTO,
   CoordinatorAssignmentDTO,
   CoordinatorDTO,
@@ -120,6 +122,9 @@ export interface ApiClient {
   listCoordinators(): Promise<CoordinatorDTO[]>;
   assignCoordinator(input: AssignCoordinatorInput): Promise<CoordinatorAssignmentDTO>;
   revokeCoordinator(assignmentId: string): Promise<{ revoked: true }>;
+
+  // ---- Admin audit-log viewer (read-only, Global-Admin enforced server-side) ----
+  listAuditLogs(params?: AuditLogListParams): Promise<AuditLogPageDTO>;
 
   // ---- Admin staff onboarding (OTP-gated, Global-Admin only) ----
   initiateOnboarding(input: InitiateOnboardingInput): Promise<StaffOnboardingDTO>;
@@ -357,6 +362,21 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     listIssues: (params) => {
       const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
       return request<IssueSummaryDTO[]>(`/issues${query}`, { method: 'GET' });
+    },
+
+    listAuditLogs: (params) => {
+      const qs = new URLSearchParams();
+      // Only set params that are present; the opaque `cursor` is forwarded as-is.
+      if (params?.action) qs.set('action', params.action);
+      if (params?.entityType) qs.set('entityType', params.entityType);
+      if (params?.entityId) qs.set('entityId', params.entityId);
+      if (params?.actorUserId) qs.set('actorUserId', params.actorUserId);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+      if (params?.cursor) qs.set('cursor', params.cursor);
+      const query = qs.toString();
+      return request<AuditLogPageDTO>(`/audit-logs${query ? `?${query}` : ''}`, { method: 'GET' });
     },
 
     getIssue: (id) => request<IssueDetailDTO>(`/issues/${encodeURIComponent(id)}`, { method: 'GET' }),

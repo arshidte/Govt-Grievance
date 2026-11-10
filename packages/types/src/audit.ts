@@ -69,3 +69,22 @@ export const auditLogQuerySchema = z
     path: ['from'],
   });
 export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
+
+/**
+ * Client-side request params for the audit-log read API (what callers pass to
+ * `@pg/api-client`). Distinct from the server-parsed `AuditLogQuery` (whose
+ * `from`/`to` are already `Date`s): here they are ISO-8601 strings, exactly as
+ * sent on the wire. The response shape is the shared `AuditLogPageDTO`.
+ */
+export interface AuditLogListParams {
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  actorUserId?: string;
+  /** ISO-8601 instant with timezone (e.g. `…Z`). */
+  from?: string;
+  to?: string;
+  limit?: number;
+  /** Opaque cursor from a previous page's `nextCursor` — passed through untouched. */
+  cursor?: string;
+}

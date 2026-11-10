@@ -1,3 +1,5 @@
+import type { AuditLogListParams } from '@pg/types';
+
 /**
  * Shared TanStack Query cache keys. Centralised here so apps can invalidate
  * the same keys the hooks below use (e.g. after verify-otp or profile update).
@@ -32,4 +34,11 @@ export const queryKeys = {
   /** Admin staff-onboarding list (optionally filtered by status). */
   adminOnboardings: (status?: string) =>
     status ? (['admin', 'onboarding', status] as const) : (['admin', 'onboarding'] as const),
+  /**
+   * Admin audit-log page. The full params object (all filters + cursor +
+   * limit) is part of the key, so any filter/cursor change is a distinct
+   * cache entry; the `['admin', ...]` prefix keeps it from colliding with
+   * citizen caches.
+   */
+  adminAuditLogs: (params: AuditLogListParams) => ['admin', 'audit-logs', params] as const,
 };
