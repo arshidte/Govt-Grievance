@@ -194,7 +194,12 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
       throw new ApiClientError('unknown_error', 'errors.unknown', response.status);
     }
 
-    return (await response.json()) as T;
+    // Read as text first: some endpoints legitimately return an EMPTY body
+    // (e.g. `GET /staff/search` with no match resolves to `null`, which Nest
+    // may serialize as no content). Parsing an empty string with `.json()`
+    // throws, so treat an empty body as `null`.
+    const text = await response.text();
+    return (text ? (JSON.parse(text) as T) : (null as T));
   }
 
   return {

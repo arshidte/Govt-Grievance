@@ -71,6 +71,18 @@ describe('BFF general proxy route handler (/api/v1/*) — admin hardened allowli
       expect(isAllowed('POST', ['coordinators', 'a1', 'revoke'])).toBe(true);
     });
 
+    it('allows the staff-onboarding (method, path) pairs', () => {
+      expect(isAllowed('POST', ['onboarding'])).toBe(true);
+      expect(isAllowed('GET', ['onboarding'])).toBe(true);
+      expect(isAllowed('GET', ['onboarding', 'o1'])).toBe(true);
+      expect(isAllowed('POST', ['onboarding', 'o1', 'resend'])).toBe(true);
+      expect(isAllowed('POST', ['onboarding', 'o1', 'verify'])).toBe(true);
+      expect(isAllowed('POST', ['onboarding', 'o1', 'cancel'])).toBe(true);
+      // Unlisted onboarding shapes stay blocked.
+      expect(isAllowed('DELETE', ['onboarding', 'o1'])).toBe(false);
+      expect(isAllowed('GET', ['onboarding', 'o1', 'verify'])).toBe(false);
+    });
+
     it('still blocks non-surface org verbs/shapes', () => {
       expect(isAllowed('DELETE', ['panchayats', 'p1'])).toBe(false);
       expect(isAllowed('PATCH', ['panchayats'])).toBe(false);
