@@ -235,7 +235,7 @@ export class StaffOnboardingService {
   }
 
   async cancel(actorUserId: string, id: string): Promise<StaffOnboardingDTO> {
-    const onboarding = await this.getPendingOrThrow(id);
+    await this.getPendingOrThrow(id); // validates it exists AND is pending
     const updated = await this.prisma.staffOnboarding.update({
       where: { id },
       data: { status: OnboardingStatus.cancelled, cancelledAt: new Date() },
