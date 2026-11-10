@@ -24,6 +24,18 @@ enum Language {
   ml
 }
 
+// Admin-initiated staff onboarding lifecycle (staff-onboarding milestone).
+// A `StaffOnboarding` row holds the PENDING intent to grant a staff role;
+// it deliberately creates NO `RoleAssignment` until OTP verification, so a
+// pending onboarding can never grant authorization. `expired` is derived
+// lazily (a pending row past `expiresAt`) and may also be persisted.
+enum OnboardingStatus {
+  pending
+  verified
+  cancelled
+  expired
+}
+
 // Canonical grievance/issue lifecycle statuses (mirrors @pg/types
 // IssueStatusEnum — the single source of truth). M2 activates only
 // SUBMITTED/ACKNOWLEDGED/IN_PROGRESS/RESOLVED via the transition
@@ -71,6 +83,7 @@ model User {
   notifications       Notification[]
   statusChanges       IssueStatusHistory[] @relation("statusHistoryChangedBy")
   attachmentsUploaded Attachment[]         @relation("attachmentUploadedBy")
+  staffOnboardings    StaffOnboarding[]    @relation("onboardingUser")
 }
 
 model OtpChallenge {
@@ -298,4 +311,39 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorUserId, createdAt])
+}
+
+// Admin-initiated staff onboarding (staff-onboarding milestone). Holds the
+// PENDING intent to grant a staff role (REPRESENTATIVE/COORDINATOR) to a phone
+// number, gated by OTP phone-ownership verification. Crucially, NO
+// `RoleAssignment` exists until `status` becomes `verified` — so a pending
+// onboarding grants zero authorization by construction (the session layer only
+// ever sees real, active assignments). On verification the user is upserted by
+// phone and one active assignment is created per target scope id.
+//
+// `wardIds` is populated for REPRESENTATIVE onboarding, `panchayatIds` for
+// COORDINATOR (one or more active scopes). A PARTIAL unique index (migration)
+// allows at most ONE `pending` row per phone, so a phone can't be claimed by a
+// second concurrent onboarding.
+model StaffOnboarding {
+  id           String           @id @default(cuid())
+  phone        String
+  // Set when an EXISTING user was selected; null when onboarding a brand-new
+  // phone (the user is upserted by phone at verification time).
+  userId       String?
+  user         User?            @relation("onboardingUser", fields: [userId], references: [id])
+  role         Role
+  wardIds      String[]
+  panchayatIds String[]
+  status       OnboardingStatus @default(pending)
+  // Snapshot of the OTP challenge window; also used to derive `expired`.
+  expiresAt    DateTime
+  createdBy    String // admin user id (actor)
+  verifiedAt   DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([phone, status])
+  @@index([status, createdAt])
 }
