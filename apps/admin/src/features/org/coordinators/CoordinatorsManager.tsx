@@ -10,6 +10,7 @@ import * as React from 'react';
 import { useApiClient } from '../../auth/api-client';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { StaffOnboardingSection } from '../onboarding/StaffOnboardingSection';
 import { orgErrorKey } from '../orgError';
 import { CoordinatorAssignModal } from './CoordinatorAssignModal';
 
@@ -97,6 +98,8 @@ export function CoordinatorsManager() {
           ))}
         </div>
       )}
+
+      <StaffOnboardingSection role="COORDINATOR" />
 
       <CoordinatorAssignModal
         open={assignOpen}

@@ -15,6 +15,16 @@ const KNOWN_KEYS = new Set([
   'errors.userNotFound',
   'errors.assignmentExists',
   'errors.assignmentNotFound',
+  // Staff onboarding
+  'errors.onboardingPendingExists',
+  'errors.onboardingNotFound',
+  'errors.onboardingNotPending',
+  'errors.onboardingPhoneMismatch',
+  'errors.resendCooldown',
+  'errors.scopeRequired',
+  // OTP verification (from the auth namespace)
+  'auth.invalidCode',
+  'auth.tooMany',
   'errors.generic',
 ]);
 
