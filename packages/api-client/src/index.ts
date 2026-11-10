@@ -53,3 +53,4 @@ export type {
   UploadAttachmentVariables,
 } from './issues';
 export { useNotifications, useUnreadCount, useMarkRead } from './notifications';
+export { useAuditLogs } from './audit';

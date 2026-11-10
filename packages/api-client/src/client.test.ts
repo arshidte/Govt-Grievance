@@ -163,4 +163,45 @@ describe('createApiClient', () => {
     expect(callArgs[0]).toBe(`${BASE_URL}/api/v1/users/me`);
     expect((callArgs[1] as RequestInit).method).toBe('PATCH');
   });
+
+  it('listAuditLogs serializes filters/limit/cursor and returns the page', async () => {
+    const page = { items: [{ id: 'a1', actorUserId: null, action: 'x', entityType: 'E', entityId: null, metadata: { k: 1 }, createdAt: '2026-01-01T00:00:00.000Z' }], nextCursor: 'CUR2', hasMore: true };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = createApiClient({ baseUrl: BASE_URL });
+    const result = await client.listAuditLogs({
+      action: 'panchayat.created',
+      entityType: 'Panchayat',
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-02-01T00:00:00.000Z',
+      limit: 50,
+      cursor: 'OPAQUE==cursor',
+    });
+
+    expect(result).toEqual(page); // response structure preserved (incl. opaque nextCursor)
+
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
+    expect(url.pathname).toBe('/api/v1/audit-logs');
+    expect((fetchMock.mock.calls[0]![1] as RequestInit).method).toBe('GET');
+    expect(url.searchParams.get('action')).toBe('panchayat.created');
+    expect(url.searchParams.get('entityType')).toBe('Panchayat');
+    expect(url.searchParams.get('from')).toBe('2026-01-01T00:00:00.000Z');
+    expect(url.searchParams.get('to')).toBe('2026-02-01T00:00:00.000Z');
+    expect(url.searchParams.get('limit')).toBe('50');
+    // Opaque cursor forwarded verbatim (decoded by URL parsing back to the original).
+    expect(url.searchParams.get('cursor')).toBe('OPAQUE==cursor');
+    // Absent filters are not sent.
+    expect(url.searchParams.has('entityId')).toBe(false);
+    expect(url.searchParams.has('actorUserId')).toBe(false);
+  });
+
+  it('listAuditLogs with no params requests the bare endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [], nextCursor: null, hasMore: false }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createApiClient({ baseUrl: BASE_URL });
+    const result = await client.listAuditLogs();
+    expect(result.items).toEqual([]);
+    expect(fetchMock.mock.calls[0]![0]).toBe(`${BASE_URL}/api/v1/audit-logs`);
+  });
 });

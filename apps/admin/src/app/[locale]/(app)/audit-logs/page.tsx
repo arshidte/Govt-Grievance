@@ -1,27 +1,11 @@
-import { getTranslations } from 'next-intl/server';
-import { ModulePage } from '../../../../components/ModulePage';
+import { AuditLogViewer } from '../../../../features/audit/AuditLogViewer';
 
 /**
- * Placeholder shell for the audit-logs module (M2+ scope — see ModulePage.tsx).
- * Reached only once the `(app)` layout's staff gate + shell have passed;
- * this page itself does no auth work.
+ * Admin Audit Logs viewer (M4B — replaces the `ModulePage` placeholder).
+ * Reached only after the `(app)` layout's `requireStaff` gate; the data itself
+ * is Global-Admin-only, enforced by the BFF/API (`@Roles('ADMIN')`), so a
+ * non-admin staff member sees the viewer's Forbidden state rather than data.
  */
-export default async function AuditLogsPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  const [tNav, tModules] = await Promise.all([
-    getTranslations({ locale, namespace: 'nav' }),
-    getTranslations({ locale, namespace: 'admin.modules' }),
-  ]);
-
-  return (
-    <ModulePage
-      title={tNav('auditLogs')}
-      description={tModules('auditLogsDescription')}
-      testId="admin-audit-logs-page"
-    />
-  );
+export default function AuditLogsPage() {
+  return <AuditLogViewer />;
 }
