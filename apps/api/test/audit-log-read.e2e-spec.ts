@@ -119,6 +119,24 @@ describe('Audit log read API (e2e)', () => {
     expect(Array.isArray(ok.body.items)).toBe(true);
   });
 
+  it('403 for a scoped-staff (COORDINATOR) role — requires GLOBAL admin, not org-scoped staff', async () => {
+    // Promote the existing citizen session to a panchayat-scoped COORDINATOR
+    // (org-scoped staff — NOT global ADMIN) and confirm it is still denied.
+    const p = await prisma.panchayat.create({
+      data: { code: `${runId}-cp`, name: 'Coord P', nameMl: 'ml' },
+    });
+    const ra = await prisma.roleAssignment.create({
+      data: { userId: citizen.userId, role: 'COORDINATOR', panchayatId: p.id },
+    });
+    try {
+      const res = await api().get('/api/v1/audit-logs').set('Cookie', citizen.cookie);
+      expect(res.status).toBe(403);
+    } finally {
+      await prisma.roleAssignment.delete({ where: { id: ra.id } });
+      await prisma.panchayat.delete({ where: { id: p.id } });
+    }
+  });
+
   // ---- Response shape + security -----------------------------------------
 
   it('returns only the defined fields (no ip), metadata as stored, no actor enrichment', async () => {

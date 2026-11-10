@@ -41,6 +41,18 @@ export interface AuditLogPageDTO {
  * project's standard 422 validation response); a malformed `cursor` is
  * rejected server-side when it is decoded.
  */
+/**
+ * `from`/`to` must be an UNAMBIGUOUS instant: a full ISO-8601 datetime that
+ * carries a timezone (`Z` or a numeric offset). This rejects tz-less datetimes
+ * (which would otherwise be interpreted in the server's local time) and
+ * non-ISO formats, so the inclusive bounds mean the same thing regardless of
+ * server timezone. Parsed to a `Date` for the query.
+ */
+const isoInstant = z
+  .string()
+  .datetime({ offset: true, message: 'invalid_timestamp' })
+  .transform((s) => new Date(s));
+
 export const auditLogQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -49,8 +61,8 @@ export const auditLogQuerySchema = z
     entityType: z.string().min(1).max(200).optional(),
     entityId: z.string().min(1).max(200).optional(),
     actorUserId: z.string().min(1).max(200).optional(),
-    from: z.coerce.date().optional(),
-    to: z.coerce.date().optional(),
+    from: isoInstant.optional(),
+    to: isoInstant.optional(),
   })
   .refine((q) => !(q.from && q.to) || q.from <= q.to, {
     message: 'from_after_to',
