@@ -29,4 +29,7 @@ export const queryKeys = {
   adminRepresentatives: ['admin', 'representatives'] as const,
   /** Admin coordinator list (users with active panchayat assignments). */
   adminCoordinators: ['admin', 'coordinators'] as const,
+  /** Admin staff-onboarding list (optionally filtered by status). */
+  adminOnboardings: (status?: string) =>
+    status ? (['admin', 'onboarding', status] as const) : (['admin', 'onboarding'] as const),
 };

@@ -52,10 +52,14 @@ export class OtpService {
    * requested more than `OTP_RATE_LIMIT_PER_PHONE_PER_HOUR` challenges in
    * the last hour.
    */
-  async request(phone: string): Promise<void> {
+  async request(phone: string, purpose: string = 'login'): Promise<void> {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    // Rate limit is scoped to the SAME purpose, so onboarding challenges never
+    // consume a phone's login quota (and vice versa). Existing login callers
+    // pass the default 'login', and all pre-existing challenges are 'login',
+    // so login behavior is byte-identical.
     const recentCount = await this.prisma.otpChallenge.count({
-      where: { phone, createdAt: { gte: oneHourAgo } },
+      where: { phone, purpose, createdAt: { gte: oneHourAgo } },
     });
 
     if (recentCount >= env.OTP_RATE_LIMIT_PER_PHONE_PER_HOUR) {
@@ -67,7 +71,7 @@ export class OtpService {
     const expiresAt = new Date(Date.now() + env.OTP_TTL_SECONDS * 1000);
 
     await this.prisma.otpChallenge.create({
-      data: { phone, codeHash, expiresAt },
+      data: { phone, codeHash, expiresAt, purpose },
     });
 
     // Plaintext code exists only in this local variable and the outbound
@@ -82,9 +86,12 @@ export class OtpService {
    * attempts exhausted) so the response never discloses which case
    * occurred.
    */
-  async verify(phone: string, code: string): Promise<{ ok: true }> {
+  async verify(phone: string, code: string, purpose: string = 'login'): Promise<{ ok: true }> {
+    // Scope the lookup to the matching purpose so an onboarding OTP can NEVER
+    // satisfy a login verification (and vice versa) — they target disjoint
+    // challenge sets even for the same phone.
     const challenge = await this.prisma.otpChallenge.findFirst({
-      where: { phone },
+      where: { phone, purpose },
       orderBy: { createdAt: 'desc' },
     });
 

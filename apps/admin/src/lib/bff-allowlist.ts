@@ -122,6 +122,13 @@ const ADMIN_ALLOWLIST: readonly AllowlistEntry[] = [
   { method: 'GET', pattern: 'coordinators' },
   { method: 'POST', pattern: 'coordinators' },
   { method: 'POST', pattern: 'coordinators/:id/revoke' },
+  //   Staff onboarding (admin-initiated, OTP-gated). All admin-only server-side.
+  { method: 'POST', pattern: 'onboarding' },
+  { method: 'GET', pattern: 'onboarding' },
+  { method: 'GET', pattern: 'onboarding/:id' },
+  { method: 'POST', pattern: 'onboarding/:id/resend' },
+  { method: 'POST', pattern: 'onboarding/:id/verify' },
+  { method: 'POST', pattern: 'onboarding/:id/cancel' },
 ];
 
 /**

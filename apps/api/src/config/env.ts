@@ -38,6 +38,10 @@ const envSchema = z.object({
   OTP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: z.coerce.number().int().positive().default(5),
+  // Minimum seconds between consecutive onboarding-OTP sends for one
+  // onboarding record (resend cooldown). Has a default, so existing .env
+  // files need no change; onboarding-only, never affects login OTP.
+  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
   // Per-IP request limit for `/auth/*` routes within a 60s window, enforced
   // by the global throttler (see src/common/throttler.config.ts, which now
   // sources this validated value so there is ONE config contract). The
