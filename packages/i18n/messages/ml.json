@@ -302,7 +302,13 @@
     "wardInactive": "ആ വാർഡ് നിഷ്ക്രിയമാണ്.",
     "userNotFound": "ഉപയോക്താവിനെ കണ്ടെത്തിയില്ല.",
     "assignmentExists": "ആ നിയമനം ഇതിനകം നിലവിലുണ്ട്.",
-    "assignmentNotFound": "നിയമനം കണ്ടെത്തിയില്ല."
+    "assignmentNotFound": "നിയമനം കണ്ടെത്തിയില്ല.",
+    "onboardingPendingExists": "ഈ ഫോൺ നമ്പറിനായി ഇതിനകം തീർപ്പാക്കാത്ത ഓൺബോർഡിംഗ് ഉണ്ട്.",
+    "onboardingNotFound": "ഓൺബോർഡിംഗ് കണ്ടെത്തിയില്ല.",
+    "onboardingNotPending": "ഈ ഓൺബോർഡിംഗ് ഇനി തീർപ്പാക്കാത്തതല്ല.",
+    "onboardingPhoneMismatch": "തിരഞ്ഞെടുത്ത ഉപയോക്താവിന്റെ ഫോൺ പൊരുത്തപ്പെടുന്നില്ല.",
+    "resendCooldown": "മറ്റൊരു കോഡ് അഭ്യർത്ഥിക്കുന്നതിന് മുമ്പ് കാത്തിരിക്കുക.",
+    "scopeRequired": "കുറഞ്ഞത് ഒരു സ്കോപ്പെങ്കിലും തിരഞ്ഞെടുക്കുക."
   },
   "admin": {
     "loginTitle": "സ്റ്റാഫ് സൈൻ ഇൻ",
@@ -438,6 +444,49 @@
       "revokeAria": "{panchayat} നിയമനം പിൻവലിക്കുക",
       "revokeConfirmTitle": "നിയമനം പിൻവലിക്കുക",
       "revokeConfirmMessage": "{name} എന്നയാളുടെ {panchayat} നിയമനം പിൻവലിക്കണോ? അവർക്ക് അതിലേക്കുള്ള കോർഡിനേറ്റർ ആക്സസ് നഷ്ടപ്പെടും."
+    },
+    "onboarding": {
+      "titleRep": "ഒരു പ്രതിനിധിയെ ചേർക്കുക",
+      "titleCoord": "ഒരു കോർഡിനേറ്ററെ ചേർക്കുക",
+      "phoneLabel": "ഫോൺ നമ്പർ",
+      "search": "തിരയുക",
+      "existingUser": "നിലവിലുള്ള അക്കൗണ്ട് കണ്ടെത്തി: {name}",
+      "newAccountNotice": "അക്കൗണ്ട് ഇല്ല — പരിശോധനയിൽ ഒരു തൽക്കാലിക സ്റ്റാഫ് അക്കൗണ്ട് സൃഷ്ടിക്കും.",
+      "panchayatSelectLabel": "പഞ്ചായത്ത്",
+      "panchayatSelectPlaceholder": "ഒരു പഞ്ചായത്ത് തിരഞ്ഞെടുക്കുക",
+      "wardsLegend": "വാർഡുകൾ",
+      "panchayatsLegend": "പഞ്ചായത്തുകൾ",
+      "noActiveScopes": "സജീവമായ ഓപ്ഷനുകളൊന്നുമില്ല.",
+      "wardShort": "വാർഡ്",
+      "reviewNext": "അവലോകനം",
+      "roleLabel": "റോൾ",
+      "roleRep": "പ്രതിനിധി",
+      "roleCoord": "കോർഡിനേറ്റർ",
+      "accountLabel": "അക്കൗണ്ട്",
+      "accountExisting": "നിലവിലുള്ള ഉപയോക്താവ്",
+      "accountNew": "പുതിയ തൽക്കാലിക അക്കൗണ്ട്",
+      "otpNotice": "സ്റ്റാഫ് അംഗം സ്ഥിരീകരിക്കാൻ ഫോണിലേക്ക് ഒരു OTP അയയ്ക്കും. അടുത്ത ഘട്ടത്തിൽ അത് നൽകുക.",
+      "initiateSubmit": "OTP അയയ്ക്കുക",
+      "verifyTitle": "ഫോൺ ഉടമസ്ഥത പരിശോധിക്കുക",
+      "verifyPrompt": "{phone} ലേക്ക് അയച്ച 6 അക്ക കോഡ് നൽകുക.",
+      "codeLabel": "പരിശോധനാ കോഡ്",
+      "resend": "കോഡ് വീണ്ടും അയയ്ക്കുക",
+      "resendSent": "ഒരു പുതിയ കോഡ് അയച്ചു.",
+      "verifySubmit": "പരിശോധിച്ച് സജീവമാക്കുക",
+      "pendingTitle": "തീർപ്പാക്കാത്ത ഓൺബോർഡിംഗ്",
+      "startButton": "പുതിയ സ്റ്റാഫിനെ ചേർക്കുക",
+      "pendingEmpty": "തീർപ്പാക്കാത്ത ഓൺബോർഡിംഗ് ഒന്നുമില്ല.",
+      "enterCode": "കോഡ് നൽകുക",
+      "cancelOnboarding": "റദ്ദാക്കുക",
+      "newAccountTag": "പുതിയ അക്കൗണ്ട്",
+      "cancelConfirmTitle": "ഓൺബോർഡിംഗ് റദ്ദാക്കുക",
+      "cancelConfirmMessage": "{phone} എന്നതിനായുള്ള തീർപ്പാക്കാത്ത ഓൺബോർഡിംഗ് റദ്ദാക്കണോ? ഒരു റോളും നൽകില്ല.",
+      "status": {
+        "pending": "തീർപ്പാക്കാത്തത്",
+        "verified": "പരിശോധിച്ചു",
+        "cancelled": "റദ്ദാക്കി",
+        "expired": "കാലഹരണപ്പെട്ടു"
+      }
     }
   }
 }

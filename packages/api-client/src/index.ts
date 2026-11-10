@@ -29,6 +29,14 @@ export type {
   CreateWardVariables,
   UpdateWardVariables,
 } from './org-admin';
+export {
+  useOnboardings,
+  useInitiateOnboarding,
+  useResendOnboarding,
+  useVerifyOnboarding,
+  useCancelOnboarding,
+} from './onboarding';
+export type { VerifyOnboardingVariables } from './onboarding';
 export { useUpdateProfile } from './profile';
 export {
   useIssues,

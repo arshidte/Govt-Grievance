@@ -9,6 +9,7 @@ import type {
   CreateOnBehalfInput,
   CreatePanchayatInput,
   CreateWardInput,
+  InitiateOnboardingInput,
   IssueDetailDTO,
   IssueSummaryDTO,
   MeResponse,
@@ -18,6 +19,7 @@ import type {
   RepresentativeAssignmentDTO,
   RepresentativeDTO,
   RequestOtpInput,
+  StaffOnboardingDTO,
   StaffUserDTO,
   TransitionInput,
   UpdatePanchayatInput,
@@ -118,6 +120,14 @@ export interface ApiClient {
   listCoordinators(): Promise<CoordinatorDTO[]>;
   assignCoordinator(input: AssignCoordinatorInput): Promise<CoordinatorAssignmentDTO>;
   revokeCoordinator(assignmentId: string): Promise<{ revoked: true }>;
+
+  // ---- Admin staff onboarding (OTP-gated, Global-Admin only) ----
+  initiateOnboarding(input: InitiateOnboardingInput): Promise<StaffOnboardingDTO>;
+  listOnboardings(status?: string): Promise<StaffOnboardingDTO[]>;
+  getOnboarding(id: string): Promise<StaffOnboardingDTO>;
+  resendOnboarding(id: string): Promise<StaffOnboardingDTO>;
+  verifyOnboarding(id: string, code: string): Promise<StaffOnboardingDTO>;
+  cancelOnboarding(id: string): Promise<StaffOnboardingDTO>;
   createIssue(input: CreateIssueInput, idempotencyKey?: string): Promise<IssueDetailDTO>;
   createOnBehalf(input: CreateOnBehalfInput, idempotencyKey?: string): Promise<OnBehalfResult>;
   listIssues(params?: { status?: string }): Promise<IssueSummaryDTO[]>;
@@ -184,7 +194,12 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
       throw new ApiClientError('unknown_error', 'errors.unknown', response.status);
     }
 
-    return (await response.json()) as T;
+    // Read as text first: some endpoints legitimately return an EMPTY body
+    // (e.g. `GET /staff/search` with no match resolves to `null`, which Nest
+    // may serialize as no content). Parsing an empty string with `.json()`
+    // throws, so treat an empty body as `null`.
+    const text = await response.text();
+    return (text ? (JSON.parse(text) as T) : (null as T));
   }
 
   return {
@@ -299,6 +314,31 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
         `/coordinators/${encodeURIComponent(assignmentId)}/revoke`,
         { method: 'POST' },
       ),
+
+    // ---- Staff onboarding ------------------------------------------------
+    initiateOnboarding: (input) =>
+      request<StaffOnboardingDTO>('/onboarding', { method: 'POST', body: JSON.stringify(input) }),
+
+    listOnboardings: (status) =>
+      request<StaffOnboardingDTO[]>(
+        `/onboarding${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+        { method: 'GET' },
+      ),
+
+    getOnboarding: (id) =>
+      request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}`, { method: 'GET' }),
+
+    resendOnboarding: (id) =>
+      request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}/resend`, { method: 'POST' }),
+
+    verifyOnboarding: (id, code) =>
+      request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      }),
+
+    cancelOnboarding: (id) =>
+      request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 
     createIssue: (input, idempotencyKey) =>
       request<IssueDetailDTO>('/issues', {

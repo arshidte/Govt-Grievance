@@ -302,7 +302,13 @@
     "wardInactive": "That ward is inactive.",
     "userNotFound": "No user found.",
     "assignmentExists": "That assignment already exists.",
-    "assignmentNotFound": "Assignment not found."
+    "assignmentNotFound": "Assignment not found.",
+    "onboardingPendingExists": "There is already a pending onboarding for this phone number.",
+    "onboardingNotFound": "Onboarding not found.",
+    "onboardingNotPending": "This onboarding is no longer pending.",
+    "onboardingPhoneMismatch": "The selected user's phone does not match.",
+    "resendCooldown": "Please wait before requesting another code.",
+    "scopeRequired": "Select at least one scope."
   },
   "admin": {
     "loginTitle": "Staff sign in",
@@ -438,6 +444,49 @@
       "revokeAria": "Revoke {panchayat} assignment",
       "revokeConfirmTitle": "Revoke assignment",
       "revokeConfirmMessage": "Revoke {name}’s assignment to {panchayat}? They will lose coordinator access to it."
+    },
+    "onboarding": {
+      "titleRep": "Onboard a representative",
+      "titleCoord": "Onboard a coordinator",
+      "phoneLabel": "Phone number",
+      "search": "Search",
+      "existingUser": "Existing account found: {name}",
+      "newAccountNotice": "No account yet — a pending staff account will be created on verification.",
+      "panchayatSelectLabel": "Panchayat",
+      "panchayatSelectPlaceholder": "Choose a panchayat",
+      "wardsLegend": "Wards",
+      "panchayatsLegend": "Panchayats",
+      "noActiveScopes": "No active options available.",
+      "wardShort": "Ward",
+      "reviewNext": "Review",
+      "roleLabel": "Role",
+      "roleRep": "Representative",
+      "roleCoord": "Coordinator",
+      "accountLabel": "Account",
+      "accountExisting": "Existing user",
+      "accountNew": "New pending account",
+      "otpNotice": "An OTP will be sent to the phone for the staff member to confirm. Enter it on the next step.",
+      "initiateSubmit": "Send OTP",
+      "verifyTitle": "Verify phone ownership",
+      "verifyPrompt": "Enter the 6-digit code sent to {phone}.",
+      "codeLabel": "Verification code",
+      "resend": "Resend code",
+      "resendSent": "A new code has been sent.",
+      "verifySubmit": "Verify & activate",
+      "pendingTitle": "Pending onboarding",
+      "startButton": "Onboard new staff",
+      "pendingEmpty": "No pending onboarding.",
+      "enterCode": "Enter code",
+      "cancelOnboarding": "Cancel",
+      "newAccountTag": "New account",
+      "cancelConfirmTitle": "Cancel onboarding",
+      "cancelConfirmMessage": "Cancel the pending onboarding for {phone}? No role will be granted.",
+      "status": {
+        "pending": "Pending",
+        "verified": "Verified",
+        "cancelled": "Cancelled",
+        "expired": "Expired"
+      }
     }
   }
 }

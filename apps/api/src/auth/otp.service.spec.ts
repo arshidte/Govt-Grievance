@@ -162,4 +162,33 @@ describe('OtpService', () => {
     const replay = service.verify(phone, code as string);
     await expect(replay).rejects.toBeInstanceOf(ApiError);
   });
+
+  it('an onboarding-purpose code cannot be verified as a login OTP (purpose isolation)', async () => {
+    const phone = freshPhone();
+
+    // Only an onboarding challenge exists for this phone.
+    await service.request(phone, 'staff_onboarding');
+    const code = sms.lastCodeFor(phone) as string;
+
+    // Login verify (default purpose) must NOT find/accept the onboarding code.
+    await expect(service.verify(phone, code)).rejects.toBeInstanceOf(ApiError);
+
+    // The same code DOES verify under its own onboarding purpose.
+    const ok = await service.verify(phone, code, 'staff_onboarding');
+    expect(ok).toEqual({ ok: true });
+  });
+
+  it('rate limit is scoped per purpose (onboarding sends do not exhaust the login quota)', async () => {
+    const phone = freshPhone();
+
+    // Exhaust the onboarding quota (5/hr) for this phone.
+    for (let i = 0; i < 5; i += 1) {
+      await service.request(phone, 'staff_onboarding');
+    }
+    // A 6th onboarding request trips the onboarding-scoped limit...
+    await expect(service.request(phone, 'staff_onboarding')).rejects.toBeInstanceOf(ApiError);
+
+    // ...but a LOGIN request for the same phone is unaffected (separate bucket).
+    await expect(service.request(phone, 'login')).resolves.toBeUndefined();
+  });
 });

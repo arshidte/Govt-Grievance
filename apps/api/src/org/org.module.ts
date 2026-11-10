@@ -7,6 +7,8 @@ import { PanchayatsController } from './panchayats.controller';
 import { PanchayatsService } from './panchayats.service';
 import { StaffAssignmentsController } from './staff-assignments.controller';
 import { StaffAssignmentsService } from './staff-assignments.service';
+import { StaffOnboardingController } from './staff-onboarding.controller';
+import { StaffOnboardingService } from './staff-onboarding.service';
 import { WardsController } from './wards.controller';
 import { WardsService } from './wards.service';
 
@@ -23,7 +25,12 @@ import { WardsService } from './wards.service';
  */
 @Module({
   imports: [AuthModule, AccessModule, AuditModule],
-  controllers: [PanchayatsController, WardsController, StaffAssignmentsController],
-  providers: [PanchayatsService, WardsService, StaffAssignmentsService],
+  controllers: [
+    PanchayatsController,
+    WardsController,
+    StaffAssignmentsController,
+    StaffOnboardingController,
+  ],
+  providers: [PanchayatsService, WardsService, StaffAssignmentsService, StaffOnboardingService],
 })
 export class OrgModule {}

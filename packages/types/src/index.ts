@@ -3,6 +3,7 @@ export * from './auth';
 export * from './user';
 export * from './org';
 export * from './staff';
+export * from './onboarding';
 export * from './category';
 export * from './issue';
 export * from './notification';

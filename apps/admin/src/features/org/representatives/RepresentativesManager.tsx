@@ -10,6 +10,7 @@ import * as React from 'react';
 import { useApiClient } from '../../auth/api-client';
 
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { StaffOnboardingSection } from '../onboarding/StaffOnboardingSection';
 import { orgErrorKey } from '../orgError';
 import { RepresentativeAssignModal } from './RepresentativeAssignModal';
 
@@ -99,6 +100,8 @@ export function RepresentativesManager() {
           ))}
         </div>
       )}
+
+      <StaffOnboardingSection role="REPRESENTATIVE" />
 
       <RepresentativeAssignModal
         open={assignOpen}
