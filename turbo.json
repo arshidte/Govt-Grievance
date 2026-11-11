@@ -6,6 +6,9 @@
     "lint": {},
     "//#lint": { "dependsOn": ["@pg/types#build"] },
     "typecheck": { "dependsOn": ["^build"] },
-    "test": { "dependsOn": ["^build"], "passThroughEnv": ["DATABASE_URL"] }
+    "test": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL", "DIRECT_DATABASE_URL", "RUNTIME_DATABASE_URL"]
+    }
   }
 }
