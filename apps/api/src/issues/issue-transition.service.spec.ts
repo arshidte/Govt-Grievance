@@ -1,12 +1,21 @@
 import type { IssueStatus } from '@pg/types';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { AuditService } from '../audit/audit.service';
 import type { SessionUser } from '../auth/session.service';
 import { ApiError } from '../common/api-error';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
 import { IssueTransitionService } from './issue-transition.service';
+
+/**
+ * No-op audit stub (M4C): the service now records a transactional audit via
+ * `audit.recordTx(tx, …)`; this stub keeps these pure-logic unit tests focused
+ * on transition behavior (the real transactional coupling + audit content are
+ * covered by the M4C e2e specs against a real DB).
+ */
+const auditStub = { record: vi.fn(), recordTx: vi.fn(async () => undefined) } as unknown as AuditService;
 
 /**
  * Task 10 unit coverage. Prisma is a hand-built stub (not a real DB): each
@@ -109,7 +118,7 @@ describe('IssueTransitionService', () => {
 
   it('accepts SUBMITTED -> ACKNOWLEDGED (conditional update + one history + one notification)', async () => {
     const stub = makeStub({ issueRow: issueRow('SUBMITTED'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     const dto = await service.transition(actor, 'issue-1', { toStatus: 'ACKNOWLEDGED', note: 'n' });
 
@@ -141,7 +150,7 @@ describe('IssueTransitionService', () => {
 
   it('accepts ACKNOWLEDGED -> IN_PROGRESS', async () => {
     const stub = makeStub({ issueRow: issueRow('ACKNOWLEDGED'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     const dto = await service.transition(actor, 'issue-1', { toStatus: 'IN_PROGRESS' });
 
@@ -156,7 +165,7 @@ describe('IssueTransitionService', () => {
 
   it('accepts IN_PROGRESS -> RESOLVED', async () => {
     const stub = makeStub({ issueRow: issueRow('IN_PROGRESS'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     const dto = await service.transition(actor, 'issue-1', { toStatus: 'RESOLVED' });
 
@@ -171,7 +180,7 @@ describe('IssueTransitionService', () => {
 
   it('rejects a skip (SUBMITTED -> IN_PROGRESS) with 422 invalid_transition and never attempts an update', async () => {
     const stub = makeStub({ issueRow: issueRow('SUBMITTED'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     const attempt = service.transition(actor, 'issue-1', { toStatus: 'IN_PROGRESS' });
 
@@ -188,7 +197,7 @@ describe('IssueTransitionService', () => {
 
   it('rejects SUBMITTED -> CLOSED with 422 invalid_transition', async () => {
     const stub = makeStub({ issueRow: issueRow('SUBMITTED'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     await expect(
       service.transition(actor, 'issue-1', { toStatus: 'CLOSED' }),
@@ -198,7 +207,7 @@ describe('IssueTransitionService', () => {
 
   it('rejects a backward move (ACKNOWLEDGED -> SUBMITTED) with 422 invalid_transition', async () => {
     const stub = makeStub({ issueRow: issueRow('ACKNOWLEDGED'), updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     await expect(
       service.transition(actor, 'issue-1', { toStatus: 'SUBMITTED' }),
@@ -208,7 +217,7 @@ describe('IssueTransitionService', () => {
 
   it('throws 404 issue_not_found when the issue id does not exist', async () => {
     const stub = makeStub({ issueRow: null, updateManyCount: 1 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     await expect(
       service.transition(actor, 'missing', { toStatus: 'ACKNOWLEDGED' }),
@@ -218,7 +227,7 @@ describe('IssueTransitionService', () => {
 
   it('throws 409 stale_status when the conditional update matches no row (count 0) and writes no history/notification', async () => {
     const stub = makeStub({ issueRow: issueRow('SUBMITTED'), updateManyCount: 0 });
-    const service = new IssueTransitionService(stub.prisma, notifications);
+    const service = new IssueTransitionService(stub.prisma, notifications, auditStub);
 
     const attempt = service.transition(actor, 'issue-1', { toStatus: 'ACKNOWLEDGED' });
 

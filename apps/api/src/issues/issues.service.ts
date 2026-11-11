@@ -10,6 +10,7 @@ import type {
 import type { Prisma } from '@prisma/client';
 
 import { AccessControlService } from '../access/access-control.service';
+import { AuditService } from '../audit/audit.service';
 import type { SessionUser } from '../auth/session.service';
 import { ApiError } from '../common/api-error';
 import { fingerprintOf, IdempotencyService } from '../common/idempotency/idempotency.service';
@@ -160,6 +161,7 @@ export class IssuesService {
     private readonly notifications: NotificationsService,
     private readonly accessControl: AccessControlService,
     private readonly transitions: IssueTransitionService,
+    private readonly audit: AuditService,
   ) {}
 
   async createForCitizen(
@@ -210,6 +212,24 @@ export class IssuesService {
           issueId: issue.id,
           citizenId: user.id,
           referenceNo,
+        });
+
+        // Governance audit, atomic with the issue + notification (same tx).
+        // Runs only on a genuine fresh create (`idempotency.run` never invokes
+        // this callback on a replay), so a retried submission won't duplicate
+        // the audit event. No PII beyond the citizen's own id as actor.
+        await this.audit.recordTx(tx, {
+          actorUserId: user.id,
+          action: 'issue.submitted',
+          entityType: 'Issue',
+          entityId: issue.id,
+          metadata: {
+            referenceNo,
+            panchayatId: dto.panchayatId,
+            wardId: dto.wardId,
+            categoryId: dto.categoryId,
+            onBehalfOf: false,
+          },
         });
 
         const dtoResult = toIssueDetailDTO(issue);

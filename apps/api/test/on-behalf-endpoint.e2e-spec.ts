@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { purgeAuditLogs } from './helpers/append-only';
 import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
 import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
@@ -147,7 +148,7 @@ describe('POST /issues/on-behalf (e2e)', () => {
     await prisma.issue.deleteMany({ where: { id: { in: createdIssueIds } } });
     await prisma.issue.deleteMany({ where: { createdById: { in: createdUserIds } } });
     await prisma.idempotencyKey.deleteMany({ where: { userId: { in: createdUserIds } } });
-    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: createdUserIds } } });
+    await purgeAuditLogs(prisma, { actorUserId: { in: createdUserIds } });
     await prisma.ward.deleteMany({ where: { id: wardId } });
     await prisma.panchayat.deleteMany({ where: { id: panchayatId } });
     await prisma.category.deleteMany({ where: { id: categoryId } });

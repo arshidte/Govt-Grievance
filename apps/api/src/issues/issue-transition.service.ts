@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { IssueDetailDTO, IssueStatus } from '@pg/types';
 
+import { AuditService } from '../audit/audit.service';
 import type { SessionUser } from '../auth/session.service';
 import { ApiError } from '../common/api-error';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -50,6 +51,7 @@ export class IssueTransitionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async transition(actor: SessionUser, issueId: string, input: TransitionInput): Promise<IssueDetailDTO> {
@@ -117,6 +119,24 @@ export class IssueTransitionService {
         issueId,
         recipientId: issue.citizenId,
         statusHistoryId: history.id,
+      });
+
+      // 3e. Governance audit, atomic with the status flip + history +
+      //     notification (same tx). IssueStatusHistory remains the
+      //     authoritative proceedings record; this is the security/governance
+      //     mirror. Actor is the staff member; metadata carries the reference,
+      //     from/to, and the same note already persisted on the history row.
+      await this.audit.recordTx(tx, {
+        actorUserId: actor.id,
+        action: 'issue.status_changed',
+        entityType: 'Issue',
+        entityId: issueId,
+        metadata: {
+          referenceNo: issue.referenceNo,
+          from: expectedFrom,
+          to: toStatus,
+          note: note ?? null,
+        },
       });
     });
 

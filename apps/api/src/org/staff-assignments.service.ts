@@ -104,8 +104,20 @@ export class StaffAssignmentsService {
 
     let created;
     try {
-      created = await this.prisma.roleAssignment.create({
-        data: { userId, role: Role.REPRESENTATIVE, wardId, grantedBy: actorUserId },
+      // Assignment + its audit row commit atomically (M4C): if the audit write
+      // fails, the assignment rolls back too.
+      created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.roleAssignment.create({
+          data: { userId, role: Role.REPRESENTATIVE, wardId, grantedBy: actorUserId },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'representative.assigned',
+          entityType: 'RoleAssignment',
+          entityId: row.id,
+          metadata: { userId, wardId, panchayatId: ward.panchayatId },
+        });
+        return row;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -113,14 +125,6 @@ export class StaffAssignmentsService {
       }
       throw err;
     }
-
-    await this.audit.record({
-      actorUserId,
-      action: 'representative.assigned',
-      entityType: 'RoleAssignment',
-      entityId: created.id,
-      metadata: { userId, wardId, panchayatId: ward.panchayatId },
-    });
 
     return {
       assignmentId: created.id,
@@ -192,8 +196,19 @@ export class StaffAssignmentsService {
 
     let created;
     try {
-      created = await this.prisma.roleAssignment.create({
-        data: { userId, role: Role.COORDINATOR, panchayatId, grantedBy: actorUserId },
+      // Assignment + audit row commit atomically (M4C).
+      created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.roleAssignment.create({
+          data: { userId, role: Role.COORDINATOR, panchayatId, grantedBy: actorUserId },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'coordinator.assigned',
+          entityType: 'RoleAssignment',
+          entityId: row.id,
+          metadata: { userId, panchayatId },
+        });
+        return row;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -201,14 +216,6 @@ export class StaffAssignmentsService {
       }
       throw err;
     }
-
-    await this.audit.record({
-      actorUserId,
-      action: 'coordinator.assigned',
-      entityType: 'RoleAssignment',
-      entityId: created.id,
-      metadata: { userId, panchayatId },
-    });
 
     return {
       assignmentId: created.id,
@@ -245,20 +252,23 @@ export class StaffAssignmentsService {
     if (!assignment) {
       throw new ApiError('assignment_not_found', 404, 'errors.assignmentNotFound');
     }
-    await this.prisma.roleAssignment.update({
-      where: { id: assignmentId },
-      data: { revokedAt: new Date(), revokedBy: actorUserId },
-    });
-    await this.audit.record({
-      actorUserId,
-      action,
-      entityType: 'RoleAssignment',
-      entityId: assignmentId,
-      metadata: {
-        userId: assignment.userId,
-        wardId: assignment.wardId,
-        panchayatId: assignment.panchayatId,
-      },
+    // Soft-revoke + audit commit atomically (M4C).
+    await this.prisma.$transaction(async (tx) => {
+      await tx.roleAssignment.update({
+        where: { id: assignmentId },
+        data: { revokedAt: new Date(), revokedBy: actorUserId },
+      });
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action,
+        entityType: 'RoleAssignment',
+        entityId: assignmentId,
+        metadata: {
+          userId: assignment.userId,
+          wardId: assignment.wardId,
+          panchayatId: assignment.panchayatId,
+        },
+      });
     });
   }
 }

@@ -15,6 +15,7 @@ import { OnBehalfRateLimit } from '../src/issues/on-behalf-rate-limit';
 import { OnBehalfService } from '../src/issues/on-behalf.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { purgeAuditLogs } from './helpers/append-only';
 
 /**
  * Task 12 (M2 spec §9, Review Focus #2): on-behalf submission service.
@@ -207,7 +208,7 @@ describe('On-behalf service (e2e)', () => {
     await prisma.issue.deleteMany({ where: { id: { in: createdIssueIds } } });
     await prisma.idempotencyKey.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.roleAssignment.deleteMany({ where: { id: { in: createdRoleAssignmentIds } } });
-    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: createdUserIds } } });
+    await purgeAuditLogs(prisma, { actorUserId: { in: createdUserIds } });
     await prisma.ward.deleteMany({ where: { id: { in: [wardAId, wardBId] } } });
     await prisma.panchayat.deleteMany({ where: { id: { in: [panchayatId, otherPanchayatId] } } });
     await prisma.category.deleteMany({ where: { id: categoryId } });

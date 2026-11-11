@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { purgeAuditLogs } from './helpers/append-only';
 import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
 import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
@@ -101,7 +102,7 @@ describe('Audit log read API (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.auditLog.deleteMany({ where: { entityType: { in: [ET, TIE] } } });
+    await purgeAuditLogs(prisma, { entityType: { in: [ET, TIE] } });
     const userIds = [admin.userId, citizen.userId];
     await prisma.roleAssignment.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
