@@ -42,21 +42,25 @@ export class WardsService {
       throw new ApiError('panchayat_not_found', 404, 'errors.panchayatNotFound');
     }
     try {
-      const created = await this.prisma.ward.create({
-        data: {
-          number: dto.number,
-          name: dto.name.trim(),
-          nameMl: dto.nameMl.trim(),
-          panchayatId,
-          status: 'active',
-        },
-      });
-      await this.audit.record({
-        actorUserId,
-        action: 'ward.created',
-        entityType: 'Ward',
-        entityId: created.id,
-        metadata: { panchayatId, number: created.number, name: created.name },
+      // Create + audit commit atomically (M4D).
+      const created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.ward.create({
+          data: {
+            number: dto.number,
+            name: dto.name.trim(),
+            nameMl: dto.nameMl.trim(),
+            panchayatId,
+            status: 'active',
+          },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'ward.created',
+          entityType: 'Ward',
+          entityId: row.id,
+          metadata: { panchayatId, number: row.number, name: row.name },
+        });
+        return row;
       });
       return toWardDTO(created);
     } catch (err) {
@@ -75,21 +79,25 @@ export class WardsService {
       throw new ApiError('ward_not_found', 404, 'errors.wardNotFound');
     }
     try {
-      const updated = await this.prisma.ward.update({
-        where: { id: wardId },
-        data: { number: dto.number, name: dto.name.trim(), nameMl: dto.nameMl.trim() },
-      });
-      await this.audit.record({
-        actorUserId,
-        action: 'ward.updated',
-        entityType: 'Ward',
-        entityId: wardId,
-        metadata: {
-          panchayatId: existing.panchayatId,
-          before: { number: existing.number, name: existing.name, nameMl: existing.nameMl },
-          after: { number: updated.number, name: updated.name, nameMl: updated.nameMl },
-          numberChanged: existing.number !== updated.number,
-        },
+      // Update + audit commit atomically (M4D).
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.ward.update({
+          where: { id: wardId },
+          data: { number: dto.number, name: dto.name.trim(), nameMl: dto.nameMl.trim() },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'ward.updated',
+          entityType: 'Ward',
+          entityId: wardId,
+          metadata: {
+            panchayatId: existing.panchayatId,
+            before: { number: existing.number, name: existing.name, nameMl: existing.nameMl },
+            after: { number: row.number, name: row.name, nameMl: row.nameMl },
+            numberChanged: existing.number !== row.number,
+          },
+        });
+        return row;
       });
       return toWardDTO(updated);
     } catch (err) {
@@ -121,13 +129,17 @@ export class WardsService {
     if (existing.status === status) {
       return toWardDTO(existing);
     }
-    const updated = await this.prisma.ward.update({ where: { id: wardId }, data: { status } });
-    await this.audit.record({
-      actorUserId,
-      action,
-      entityType: 'Ward',
-      entityId: wardId,
-      metadata: { panchayatId: existing.panchayatId, from: existing.status, to: status },
+    // Status flip + audit commit atomically (M4D).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.ward.update({ where: { id: wardId }, data: { status } });
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action,
+        entityType: 'Ward',
+        entityId: wardId,
+        metadata: { panchayatId: existing.panchayatId, from: existing.status, to: status },
+      });
+      return row;
     });
     return toWardDTO(updated);
   }

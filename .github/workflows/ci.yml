@@ -11,7 +11,18 @@ env:
   # 5435) so this single DATABASE_URL works unchanged whether a developer
   # points at the GH Actions `postgres` service below (same port mapping)
   # or `docker compose -f docker-compose.dev.yml up` locally.
+  # DATABASE_URL is the Prisma Client / test-harness connection. In CI the
+  # harness runs as the admin role (it seeds + purges append-only AuditLog rows
+  # and CREATE/DROP throwaway DBs), so DATABASE_URL and DIRECT_DATABASE_URL are
+  # the same admin identity here. The constrained runtime role is verified
+  # separately by test/runtime-role-privileges.e2e-spec.ts via
+  # RUNTIME_DATABASE_URL. See apps/api/docs/db-least-privilege.md.
   DATABASE_URL: postgresql://postgres:postgres@localhost:5435/panchayat?schema=public
+  # Admin/migration connection used by `prisma migrate deploy` (directUrl).
+  DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5435/panchayat?schema=public
+  # Least-privilege runtime role (provisioned below) — connection used ONLY by
+  # the least-privilege verification spec.
+  RUNTIME_DATABASE_URL: postgresql://app_runtime:app_runtime_ci_pw@localhost:5435/panchayat?schema=public
   API_PORT: 4000
   CORS_ORIGIN_CITIZEN: http://localhost:3000
   CORS_ORIGIN_ADMIN: http://localhost:3001
@@ -84,6 +95,19 @@ jobs:
       - name: Seed database
         working-directory: apps/api
         run: pnpm exec prisma db seed
+
+      # Provision the least-privilege runtime role AFTER migrations (needs the
+      # application tables to exist for the table-level grants). Uses the admin
+      # connection (DIRECT_DATABASE_URL); the password MUST match the one in
+      # RUNTIME_DATABASE_URL above. ubuntu-latest ships the psql client.
+      - name: Provision least-privilege runtime role
+        working-directory: apps/api
+        env:
+          RUNTIME_DB_USER: app_runtime
+          RUNTIME_DB_PASSWORD: app_runtime_ci_pw
+          RUNTIME_DB_NAME: panchayat
+          MIGRATION_DB_USER: postgres
+        run: bash scripts/provision-runtime-role.sh
 
       - name: Lint, typecheck, test, build
         run: pnpm turbo run lint typecheck test build

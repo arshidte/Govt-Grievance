@@ -80,25 +80,31 @@ export class PanchayatsService {
   }
 
   async create(actorUserId: string, dto: CreatePanchayatInput): Promise<PanchayatDetailDTO> {
+    let created;
     try {
-      const created = await this.prisma.panchayat.create({
-        data: {
-          code: dto.code.trim(),
-          name: dto.name.trim(),
-          nameMl: dto.nameMl.trim(),
-          contactPhone: contactOrNull(dto.contactPhone),
-          contactEmail: contactOrNull(dto.contactEmail),
-          status: 'active',
-        },
+      // Create + its audit row commit atomically (M4D): a failed audit write
+      // rolls the panchayat insert back, so an audit row never claims a
+      // creation that didn't persist, and a creation never lacks its audit.
+      created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.panchayat.create({
+          data: {
+            code: dto.code.trim(),
+            name: dto.name.trim(),
+            nameMl: dto.nameMl.trim(),
+            contactPhone: contactOrNull(dto.contactPhone),
+            contactEmail: contactOrNull(dto.contactEmail),
+            status: 'active',
+          },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'panchayat.created',
+          entityType: 'Panchayat',
+          entityId: row.id,
+          metadata: { code: row.code, name: row.name },
+        });
+        return row;
       });
-      await this.audit.record({
-        actorUserId,
-        action: 'panchayat.created',
-        entityType: 'Panchayat',
-        entityId: created.id,
-        metadata: { code: created.code, name: created.name },
-      });
-      return this.findDetail(created.id);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         // Unique `code` collision.
@@ -106,6 +112,7 @@ export class PanchayatsService {
       }
       throw err;
     }
+    return this.findDetail(created.id);
   }
 
   /** Update mutable fields. `code` is immutable and never read here. 404 if absent. */
@@ -120,24 +127,27 @@ export class PanchayatsService {
     }
     const nextContactPhone = contactOrNull(dto.contactPhone);
     const nextContactEmail = contactOrNull(dto.contactEmail);
-    await this.prisma.panchayat.update({
-      where: { id },
-      data: {
-        name: dto.name.trim(),
-        nameMl: dto.nameMl.trim(),
-        contactPhone: nextContactPhone,
-        contactEmail: nextContactEmail,
-      },
-    });
-    await this.audit.record({
-      actorUserId,
-      action: 'panchayat.updated',
-      entityType: 'Panchayat',
-      entityId: id,
-      metadata: {
-        before: { name: existing.name, nameMl: existing.nameMl },
-        after: { name: dto.name.trim(), nameMl: dto.nameMl.trim() },
-      },
+    // Update + audit commit atomically (M4D).
+    await this.prisma.$transaction(async (tx) => {
+      await tx.panchayat.update({
+        where: { id },
+        data: {
+          name: dto.name.trim(),
+          nameMl: dto.nameMl.trim(),
+          contactPhone: nextContactPhone,
+          contactEmail: nextContactEmail,
+        },
+      });
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action: 'panchayat.updated',
+        entityType: 'Panchayat',
+        entityId: id,
+        metadata: {
+          before: { name: existing.name, nameMl: existing.nameMl },
+          after: { name: dto.name.trim(), nameMl: dto.nameMl.trim() },
+        },
+      });
     });
     return this.findDetail(id);
   }
@@ -163,13 +173,16 @@ export class PanchayatsService {
       throw new ApiError('panchayat_not_found', 404, 'errors.panchayatNotFound');
     }
     if (existing.status !== status) {
-      await this.prisma.panchayat.update({ where: { id }, data: { status } });
-      await this.audit.record({
-        actorUserId,
-        action,
-        entityType: 'Panchayat',
-        entityId: id,
-        metadata: { from: existing.status, to: status },
+      // Status flip + audit commit atomically (M4D).
+      await this.prisma.$transaction(async (tx) => {
+        await tx.panchayat.update({ where: { id }, data: { status } });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action,
+          entityType: 'Panchayat',
+          entityId: id,
+          metadata: { from: existing.status, to: status },
+        });
       });
     }
     return this.findDetail(id);
