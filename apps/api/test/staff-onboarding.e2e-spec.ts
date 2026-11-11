@@ -9,6 +9,7 @@ import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { ONBOARDING_PURPOSE } from '../src/org/staff-onboarding.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { purgeAuditLogs } from './helpers/append-only';
 import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
 import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
@@ -105,7 +106,7 @@ describe('Staff onboarding (e2e)', () => {
     const onboardedPhones = [...new Set(onboardings.map((o) => o.phone))];
     const onboardedUsers = await prisma.user.findMany({ where: { phone: { in: onboardedPhones } } });
     const allUserIds = [...userIds, ...onboardedUsers.map((u) => u.id)];
-    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: allUserIds } } });
+    await purgeAuditLogs(prisma, { actorUserId: { in: allUserIds } });
     await prisma.staffOnboarding.deleteMany({ where: { phone: { in: onboardedPhones } } });
     await prisma.roleAssignment.deleteMany({ where: { userId: { in: allUserIds } } });
     await prisma.otpChallenge.deleteMany({ where: { phone: { in: onboardedPhones } } });

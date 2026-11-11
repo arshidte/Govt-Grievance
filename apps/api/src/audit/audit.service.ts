@@ -27,12 +27,43 @@ export interface RecordAuditEventInput {
  * codes, no plaintext phone numbers beyond a masked form. This service does
  * not attempt to scrub `metadata` itself; masking is the caller's
  * responsibility (see `maskPhone` in `auth.controller.ts`).
+ *
+ * TWO WRITE MODES (M4C):
+ * - `record()` — best-effort, swallows errors, non-transactional. KEEP for
+ *   side-effect audits where the audit must never break the flow (auth/OTP/
+ *   session).
+ * - `recordTx(tx, ...)` — writes through a caller-owned Prisma transaction
+ *   client and DOES throw on failure, so a failed audit write rolls the
+ *   enclosing business transaction back. Use for critical mutations whose
+ *   audit record must commit atomically WITH them (grievance submission /
+ *   status transitions / on-behalf / org-staff mutations).
  */
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Writes one audit row THROUGH the caller's transaction client (`tx`), so it
+   * commits or rolls back together with the business mutation in the same
+   * `$transaction`. Unlike `record()`, this deliberately does NOT catch — a
+   * failed audit insert propagates and aborts the enclosing transaction, so a
+   * critical mutation can never commit without its audit row. The caller owns
+   * the transaction; this never opens its own (no nested transactions).
+   */
+  async recordTx(tx: Prisma.TransactionClient, input: RecordAuditEventInput): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        actorUserId: input.actorUserId ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        metadata: input.metadata ?? undefined,
+        ip: input.ip ?? null,
+      },
+    });
+  }
 
   /**
    * Persists one audit row. Resolves to the created row on success, or

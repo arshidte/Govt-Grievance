@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { purgeAuditLogs } from './helpers/append-only';
 import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
 import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
@@ -88,7 +89,7 @@ describe('Organization management (e2e)', () => {
 
   afterAll(async () => {
     const userIds = [admin.userId, actor.userId];
-    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+    await purgeAuditLogs(prisma, { actorUserId: { in: userIds } });
     await prisma.notification.deleteMany({ where: { issueId: { in: issueIds } } });
     await prisma.issue.deleteMany({ where: { id: { in: issueIds } } });
     await prisma.roleAssignment.deleteMany({ where: { userId: { in: userIds } } });

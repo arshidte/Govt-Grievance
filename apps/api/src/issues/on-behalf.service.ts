@@ -177,6 +177,20 @@ export class OnBehalfService {
           referenceNo,
         });
 
+        // (c2) Governance audit, ATOMIC with the issue + notification (M4C):
+        //      recorded through the same tx, inside `work`, so it commits with
+        //      the create and never duplicates on an idempotent replay. Actor
+        //      is the acting REPRESENTATIVE; the citizen is represented by the
+        //      issue (its `citizenId`) and only a MASKED phone — never
+        //      plaintext phone / profile.
+        await this.audit.recordTx(tx, {
+          actorUserId: rep.id,
+          action: 'issue.on_behalf_created',
+          entityType: 'Issue',
+          entityId: issue.id,
+          metadata: { referenceNo, wardId: dto.wardId, phoneMasked },
+        });
+
         // (d) Minimal/neutral result (exactly 4 keys; ISO createdAt). No
         //     citizen profile, no citizenId, no existence signal.
         const dtoResult: OnBehalfResult = {
@@ -189,15 +203,10 @@ export class OnBehalfService {
       },
     );
 
-    // --- Step 5: audit success --------------------------------------------
-    await this.audit.record({
-      actorUserId: rep.id,
-      action: 'issue.on_behalf_created',
-      entityType: 'Issue',
-      entityId: result.id,
-      metadata: { referenceNo: result.referenceNo, wardId: dto.wardId, phoneMasked },
-    });
-
+    // The success audit is written INSIDE the idempotency transaction (step
+    // c2) so it commits atomically with the issue and never double-records on
+    // a replay. The denial audits above remain best-effort `record()` — a
+    // denied attempt has no business mutation to couple to.
     return result;
   }
 

@@ -56,7 +56,12 @@ describe('AuthController (audit wiring)', () => {
 
   afterEach(async () => {
     if (auditedIds.length > 0) {
-      await prisma.auditLog.deleteMany({ where: { id: { in: auditedIds } } });
+      // AuditLog is append-only (M4C trigger); purge test rows via the
+      // documented superuser escape hatch (disable triggers for this tx).
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = 'replica'`);
+        await tx.auditLog.deleteMany({ where: { id: { in: auditedIds } } });
+      });
       auditedIds.length = 0;
     }
   });

@@ -1,5 +1,5 @@
 import type { CreateIssueInput } from '@pg/types';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Imported for its side effect: loads the root `.env` (DATABASE_URL etc.)
 // before PrismaService is constructed, matching the pattern used by other
@@ -11,6 +11,8 @@ import { ApiError } from '../common/api-error';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+import type { AuditService } from '../audit/audit.service';
 
 import { IssueReferenceService } from './issue-reference.service';
 import { IssueTransitionService } from './issue-transition.service';
@@ -31,8 +33,12 @@ describe('IssuesService', () => {
   const notifications = new NotificationsService();
   const issueReference = new IssueReferenceService(prisma);
   const accessControl = new AccessControlService();
-  const transitions = new IssueTransitionService(prisma, notifications);
-  const service = new IssuesService(prisma, issueReference, idempotency, notifications, accessControl, transitions);
+  // No-op audit stub: this spec exercises issue logic, not audit writes, so
+  // recordTx is a resolved no-op (the real transactional coupling is covered
+  // by the M4C audit-coverage/integrity e2e specs).
+  const audit = { record: vi.fn(), recordTx: vi.fn(async () => undefined) } as unknown as AuditService;
+  const transitions = new IssueTransitionService(prisma, notifications, audit);
+  const service = new IssuesService(prisma, issueReference, idempotency, notifications, accessControl, transitions, audit);
 
   // Shared seed fixtures, created once for the whole suite.
   let citizen: SessionUser;
