@@ -10,7 +10,8 @@
     "test:unit": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "db:provision-runtime-role": "bash scripts/provision-runtime-role.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -19,5 +19,23 @@
  * second, divergent way to find env vars. It is a no-op if some other
  * spec file already triggered it first (dotenv does not overwrite
  * already-set `process.env` keys by default).
+ *
+ * M4D (least-privilege DB roles): the TEST HARNESS is inherently
+ * administrative — it seeds fixtures, PURGES append-only AuditLog rows (via the
+ * superuser-only `session_replication_role` bypass), and CREATE/DROP throwaway
+ * databases (migration tests). Those operations are INTENTIONALLY beyond the
+ * least-privilege runtime role. So the whole suite connects with the
+ * ADMIN/migration identity: we force `process.env.DATABASE_URL` (what
+ * PrismaService reads) to `DIRECT_DATABASE_URL` when it is set. When it is NOT
+ * set (e.g. a pre-M4D `.env` with only `DATABASE_URL`), this is a no-op and the
+ * suite behaves exactly as before. The constrained runtime role is verified
+ * separately by test/runtime-role-privileges.e2e-spec.ts via
+ * `RUNTIME_DATABASE_URL`. This override must run BEFORE any `new PrismaService()`
+ * (Prisma Client reads `process.env.DATABASE_URL` live at construction), which
+ * is why it lives in this setupFiles entry.
  */
 import '../src/config/env';
+
+if (process.env.DIRECT_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.DIRECT_DATABASE_URL;
+}

@@ -29,7 +29,19 @@ loadDotEnv();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Runtime (Prisma Client) connection — the least-privilege application role
+  // in a hardened deployment. The ONLY DB URL the live API requires.
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  // Privileged connection for Prisma Migrate / schema tooling (schema owner).
+  // Optional at app runtime: Prisma Client never evaluates `directUrl`, so the
+  // API boots without it; only `prisma migrate|db` commands need it set. See
+  // docs/db-least-privilege.md.
+  DIRECT_DATABASE_URL: z.string().min(1).optional(),
+  // TEST-ONLY: explicit runtime-role URL used by the least-privilege
+  // verification spec (test/runtime-role-privileges.e2e-spec.ts) to connect AS
+  // the constrained role and assert the allow/deny matrix. Never read by app
+  // code; the spec self-skips when it is unset.
+  RUNTIME_DATABASE_URL: z.string().min(1).optional(),
   API_PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN_CITIZEN: z.string().min(1).default('http://localhost:3000'),
   CORS_ORIGIN_ADMIN: z.string().min(1).default('http://localhost:3001'),

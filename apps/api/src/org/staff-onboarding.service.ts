@@ -77,17 +77,37 @@ export class StaffOnboardingService {
 
     let onboarding: StaffOnboarding;
     try {
-      onboarding = await this.prisma.staffOnboarding.create({
-        data: {
-          phone: dto.phone,
-          userId: dto.userId ?? existingUser?.id ?? null,
-          role,
-          wardIds: role === Role.REPRESENTATIVE ? wardIds : [],
-          panchayatIds: role === Role.COORDINATOR ? panchayatIds : [],
-          status: OnboardingStatus.pending,
-          expiresAt: new Date(Date.now() + env.OTP_TTL_SECONDS * 1000),
-          createdBy: actorUserId,
-        },
+      // The onboarding row + its `staff.onboarding_initiated` audit commit
+      // atomically (M4D): a failed audit write rolls the pending onboarding
+      // back. The OTP SMS dispatch (`otp.request`) is deliberately kept OUTSIDE
+      // this transaction — it is an external side effect with its own
+      // rate-limit bookkeeping, so it must not be rolled back by an audit
+      // failure (and an audit failure must not un-send an SMS). The dispatch
+      // now runs AFTER the row+audit commit (previously between them).
+      onboarding = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.staffOnboarding.create({
+          data: {
+            phone: dto.phone,
+            userId: dto.userId ?? existingUser?.id ?? null,
+            role,
+            wardIds: role === Role.REPRESENTATIVE ? wardIds : [],
+            panchayatIds: role === Role.COORDINATOR ? panchayatIds : [],
+            status: OnboardingStatus.pending,
+            expiresAt: new Date(Date.now() + env.OTP_TTL_SECONDS * 1000),
+            createdBy: actorUserId,
+          },
+        });
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action: 'staff.onboarding_initiated',
+          entityType: 'StaffOnboarding',
+          entityId: row.id,
+          metadata: {
+            role,
+            scopeCount: role === Role.REPRESENTATIVE ? wardIds.length : panchayatIds.length,
+          },
+        });
+        return row;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -98,14 +118,6 @@ export class StaffOnboardingService {
 
     // Send the onboarding OTP (purpose-scoped; rate-limited per phone+purpose).
     await this.otp.request(dto.phone, ONBOARDING_PURPOSE);
-
-    await this.audit.record({
-      actorUserId,
-      action: 'staff.onboarding_initiated',
-      entityType: 'StaffOnboarding',
-      entityId: onboarding.id,
-      metadata: { role, scopeCount: role === Role.REPRESENTATIVE ? wardIds.length : panchayatIds.length },
-    });
 
     return this.toDTO(onboarding);
   }
@@ -128,16 +140,22 @@ export class StaffOnboardingService {
       }
     }
 
+    // OTP dispatch (external side effect) stays BEFORE the transaction: the
+    // expiry bump should only happen once a fresh code has actually been sent.
     await this.otp.request(onboarding.phone, ONBOARDING_PURPOSE);
-    const updated = await this.prisma.staffOnboarding.update({
-      where: { id },
-      data: { expiresAt: new Date(Date.now() + env.OTP_TTL_SECONDS * 1000) },
-    });
-    await this.audit.record({
-      actorUserId,
-      action: 'staff.onboarding_resent',
-      entityType: 'StaffOnboarding',
-      entityId: id,
+    // Expiry bump + audit commit atomically (M4D).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.staffOnboarding.update({
+        where: { id },
+        data: { expiresAt: new Date(Date.now() + env.OTP_TTL_SECONDS * 1000) },
+      });
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action: 'staff.onboarding_resent',
+        entityType: 'StaffOnboarding',
+        entityId: id,
+      });
+      return row;
     });
     return this.toDTO(updated);
   }
@@ -175,7 +193,7 @@ export class StaffOnboardingService {
     const scopeIds =
       onboarding.role === Role.REPRESENTATIVE ? onboarding.wardIds : onboarding.panchayatIds;
 
-    const createdAssignmentIds = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // Upsert the user by phone (resolve existing or create the account now).
       const user = await tx.user.upsert({
         where: { phone: onboarding.phone },
@@ -205,30 +223,39 @@ export class StaffOnboardingService {
         where: { id },
         data: { status: OnboardingStatus.verified, verifiedAt: new Date(), userId: user.id },
       });
+
+      // Audit the verification AND each new assignment through the SAME
+      // transaction (M4D): the `staff.onboarding_verified` row and the
+      // per-assignment `*.assigned` rows commit atomically with the assignment
+      // inserts + status flip. A failed audit write rolls the whole grant back
+      // — no assignment is ever granted without its audit trail. (The OTP
+      // consumption in `otp.verify` above is a separate auth-side effect and
+      // is not part of this business transaction — see verify() doc.)
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action: 'staff.onboarding_verified',
+        entityType: 'StaffOnboarding',
+        entityId: id,
+        metadata: {
+          role: onboarding.role,
+          assignmentsCreated: ids.length,
+          scopeCount: scopeIds.length,
+        },
+      });
+      for (const assignmentId of ids) {
+        await this.audit.recordTx(tx, {
+          actorUserId,
+          action:
+            onboarding.role === Role.REPRESENTATIVE
+              ? 'representative.assigned'
+              : 'coordinator.assigned',
+          entityType: 'RoleAssignment',
+          entityId: assignmentId,
+          metadata: { viaOnboarding: id },
+        });
+      }
       return ids;
     });
-
-    await this.audit.record({
-      actorUserId,
-      action: 'staff.onboarding_verified',
-      entityType: 'StaffOnboarding',
-      entityId: id,
-      metadata: {
-        role: onboarding.role,
-        assignmentsCreated: createdAssignmentIds.length,
-        scopeCount: scopeIds.length,
-      },
-    });
-    for (const assignmentId of createdAssignmentIds) {
-      await this.audit.record({
-        actorUserId,
-        action:
-          onboarding.role === Role.REPRESENTATIVE ? 'representative.assigned' : 'coordinator.assigned',
-        entityType: 'RoleAssignment',
-        entityId: assignmentId,
-        metadata: { viaOnboarding: id },
-      });
-    }
 
     const refreshed = await this.prisma.staffOnboarding.findUnique({ where: { id } });
     return this.toDTO(refreshed!);
@@ -236,15 +263,19 @@ export class StaffOnboardingService {
 
   async cancel(actorUserId: string, id: string): Promise<StaffOnboardingDTO> {
     await this.getPendingOrThrow(id); // validates it exists AND is pending
-    const updated = await this.prisma.staffOnboarding.update({
-      where: { id },
-      data: { status: OnboardingStatus.cancelled, cancelledAt: new Date() },
-    });
-    await this.audit.record({
-      actorUserId,
-      action: 'staff.onboarding_cancelled',
-      entityType: 'StaffOnboarding',
-      entityId: id,
+    // Cancel + audit commit atomically (M4D).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.staffOnboarding.update({
+        where: { id },
+        data: { status: OnboardingStatus.cancelled, cancelledAt: new Date() },
+      });
+      await this.audit.recordTx(tx, {
+        actorUserId,
+        action: 'staff.onboarding_cancelled',
+        entityType: 'StaffOnboarding',
+        entityId: id,
+      });
+      return row;
     });
     return this.toDTO(updated);
   }

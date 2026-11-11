@@ -4,7 +4,16 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Runtime connection used by the live API (Prisma Client). In a hardened
+  // deployment this points at the LEAST-PRIVILEGE application role
+  // (`app_runtime`): DML only, INSERT-but-not-UPDATE/DELETE on AuditLog,
+  // never a superuser or schema owner. See docs/db-least-privilege.md.
+  url = env("DATABASE_URL")
+  // Privileged connection used ONLY by Prisma Migrate / schema tooling
+  // (`prisma migrate deploy|dev`, `db push`, `migrate diff`). Points at the
+  // MIGRATION/ADMIN role (schema owner) — never used by the running API.
+  // Prisma Client ignores `directUrl`, so the API boots with `url` alone.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 enum Role {
