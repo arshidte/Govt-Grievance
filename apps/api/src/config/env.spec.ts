@@ -31,26 +31,32 @@ describe('loadEnv', () => {
 
   const DB = 'postgresql://postgres:postgres@localhost:5433/panchayat?schema=public';
 
-  it('fails closed: rejects SMS_PROVIDER=mock in production', () => {
-    expect(() => loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'mock' })).toThrow(
-      /SMS_PROVIDER must not be/,
-    );
+  it('fails closed: rejects the mock MSG91 verifier in production (unset defaults to mock)', () => {
+    expect(() => loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production' })).toThrow(/MSG91_PROVIDER must be/);
+    expect(() =>
+      loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', MSG91_PROVIDER: 'mock' }),
+    ).toThrow(/MSG91_PROVIDER must be/);
   });
 
-  it('fails closed: rejects the default (mock) provider in production when SMS_PROVIDER is unset', () => {
-    expect(() => loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production' })).toThrow(
-      /SMS_PROVIDER must not be/,
-    );
+  it('fails closed: rejects MSG91_PROVIDER=live without an authkey', () => {
+    expect(() =>
+      loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', MSG91_PROVIDER: 'live' }),
+    ).toThrow(/MSG91_AUTHKEY is required/);
   });
 
-  it('allows a real SMS provider in production', () => {
-    const result = loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'twilio' });
-    expect(result.SMS_PROVIDER).toBe('twilio');
+  it('allows the live MSG91 verifier in production when an authkey is set', () => {
+    const result = loadEnv({
+      DATABASE_URL: DB,
+      NODE_ENV: 'production',
+      MSG91_PROVIDER: 'live',
+      MSG91_AUTHKEY: 'secret-authkey',
+    });
+    expect(result.MSG91_PROVIDER).toBe('live');
   });
 
-  it('still allows the mock provider in development', () => {
-    const result = loadEnv({ DATABASE_URL: DB, NODE_ENV: 'development', SMS_PROVIDER: 'mock' });
-    expect(result.SMS_PROVIDER).toBe('mock');
+  it('still allows the mock verifier in development', () => {
+    const result = loadEnv({ DATABASE_URL: DB, NODE_ENV: 'development', MSG91_PROVIDER: 'mock' });
+    expect(result.MSG91_PROVIDER).toBe('mock');
   });
 
   describe('AUTH_THROTTLE_LIMIT', () => {
@@ -68,22 +74,22 @@ describe('loadEnv', () => {
     });
 
     it('fails closed: rejects a non-default override in production', () => {
-      // SMS_PROVIDER set to a real value so this isolates the throttle guard
-      // (production independently rejects the default mock provider).
+      // MSG91 set to live+authkey so this isolates the throttle guard
+      // (production independently rejects the default mock verifier).
       expect(() =>
-        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'twilio', AUTH_THROTTLE_LIMIT: '1000' }),
+        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', MSG91_PROVIDER: 'live', MSG91_AUTHKEY: 'k', AUTH_THROTTLE_LIMIT: '1000' }),
       ).toThrow(/AUTH_THROTTLE_LIMIT must not be overridden/);
     });
 
     it('allows the default (5) in production whether omitted or set explicitly', () => {
       expect(
-        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', SMS_PROVIDER: 'twilio' }).AUTH_THROTTLE_LIMIT,
+        loadEnv({ DATABASE_URL: DB, NODE_ENV: 'production', MSG91_PROVIDER: 'live', MSG91_AUTHKEY: 'k' }).AUTH_THROTTLE_LIMIT,
       ).toBe(5);
       expect(
         loadEnv({
           DATABASE_URL: DB,
           NODE_ENV: 'production',
-          SMS_PROVIDER: 'twilio',
+          MSG91_PROVIDER: 'live', MSG91_AUTHKEY: 'k',
           AUTH_THROTTLE_LIMIT: '5',
         }).AUTH_THROTTLE_LIMIT,
       ).toBe(5);

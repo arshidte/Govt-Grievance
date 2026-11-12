@@ -1,15 +1,15 @@
 import type { AuditService } from '../src/audit/audit.service';
 import { AuditService as RealAuditService } from '../src/audit/audit.service';
-import { OtpService } from '../src/auth/otp.service';
+import { MockMsg91Verifier } from '../src/auth/msg91/mock-msg91.verifier';
 import { PanchayatsService } from '../src/org/panchayats.service';
 import { StaffOnboardingService } from '../src/org/staff-onboarding.service';
 import { WardsService } from '../src/org/wards.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { MockSmsProvider } from '../src/sms/mock-sms.provider';
 import '../src/config/env';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { purgeAuditLogs } from './helpers/append-only';
+import { mockAccessToken } from './helpers/login';
 
 /**
  * M4D — transactional audit coverage for the remaining org/staff mutations
@@ -29,12 +29,11 @@ import { purgeAuditLogs } from './helpers/append-only';
 describe('Org/staff audit integrity (M4D, e2e)', () => {
   const prisma = new PrismaService();
   const audit = new RealAuditService(prisma);
-  const sms = new MockSmsProvider();
-  const otp = new OtpService(prisma, sms);
+  const verifier = new MockMsg91Verifier();
 
   const panchayats = new PanchayatsService(prisma, audit);
   const wards = new WardsService(prisma, audit);
-  const onboarding = new StaffOnboardingService(prisma, otp, audit);
+  const onboarding = new StaffOnboardingService(prisma, verifier, audit);
 
   // A mock audit whose transactional write ALWAYS throws (for rollback tests).
   const throwingAudit = {
@@ -45,7 +44,7 @@ describe('Org/staff audit integrity (M4D, e2e)', () => {
   } as unknown as AuditService;
   const panchayatsBroken = new PanchayatsService(prisma, throwingAudit);
   const wardsBroken = new WardsService(prisma, throwingAudit);
-  const onboardingBroken = new StaffOnboardingService(prisma, otp, throwingAudit);
+  const onboardingBroken = new StaffOnboardingService(prisma, verifier, throwingAudit);
 
   const runId = `m4d-${Date.now()}`;
   let adminId: string;
@@ -161,23 +160,21 @@ describe('Org/staff audit integrity (M4D, e2e)', () => {
     const ward = await wards.create(adminId, parent.id, { number: 1, name: 'W1', nameMl: 'ml' });
     wardIds.push(ward.id);
 
-    // Rollback first: a throwing audit aborts BEFORE the OTP send (which is
-    // outside the tx), so no onboarding row and no OTP challenge persist.
+    // Rollback first: a throwing audit aborts the initiate tx, so no onboarding
+    // row persists (the OTP is sent client-side by the widget, not the server).
     const rollbackPhone = freshPhone();
     onboardingPhones.push(rollbackPhone);
     await expect(
       onboardingBroken.initiate(adminId, { phone: rollbackPhone, role: 'REPRESENTATIVE', wardIds: [ward.id] }),
     ).rejects.toThrow();
     expect(await prisma.staffOnboarding.findFirst({ where: { phone: rollbackPhone } })).toBeNull();
-    expect(await prisma.otpChallenge.count({ where: { phone: rollbackPhone } })).toBe(0);
 
-    // Success path: pending onboarding + exactly one initiated audit + OTP sent.
+    // Success path: pending onboarding + exactly one initiated audit.
     const phone = freshPhone();
     onboardingPhones.push(phone);
     const dto = await onboarding.initiate(adminId, { phone, role: 'REPRESENTATIVE', wardIds: [ward.id] });
     expect(dto.status).toBe('pending');
     expect(await prisma.auditLog.count({ where: { entityId: dto.id, action: 'staff.onboarding_initiated' } })).toBe(1);
-    expect(await prisma.otpChallenge.count({ where: { phone } })).toBeGreaterThan(0);
   });
 
   it('onboarding.verify records verified + assigned audits inside the grant tx, and is idempotent on replay', async () => {
@@ -189,10 +186,9 @@ describe('Org/staff audit integrity (M4D, e2e)', () => {
     const phone = freshPhone();
     onboardingPhones.push(phone);
     const dto = await onboarding.initiate(adminId, { phone, role: 'REPRESENTATIVE', wardIds: [ward.id] });
-    const code = sms.lastCodeFor(phone)!;
-    expect(code).toBeDefined();
+    const token = mockAccessToken(phone);
 
-    const verified = await onboarding.verify(adminId, dto.id, code);
+    const verified = await onboarding.verify(adminId, dto.id, token);
     expect(verified.status).toBe('verified');
 
     // Business effects: user upserted, exactly one active assignment.
@@ -207,7 +203,7 @@ describe('Org/staff audit integrity (M4D, e2e)', () => {
     expect(await prisma.auditLog.count({ where: { entityId: active[0]!.id, action: 'representative.assigned' } })).toBe(1);
 
     // Idempotent replay: already-verified returns early → no second audit, no dup assignment.
-    const replay = await onboarding.verify(adminId, dto.id, code);
+    const replay = await onboarding.verify(adminId, dto.id, token);
     expect(replay.status).toBe('verified');
     expect(await prisma.auditLog.count({ where: { entityId: dto.id, action: 'staff.onboarding_verified' } })).toBe(1);
     expect(await prisma.roleAssignment.count({ where: { userId: user!.id, revokedAt: null } })).toBe(1);

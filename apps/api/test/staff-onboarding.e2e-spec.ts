@@ -7,11 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
-import { ONBOARDING_PURPOSE } from '../src/org/staff-onboarding.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { purgeAuditLogs } from './helpers/append-only';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
+import { mockAccessToken } from './helpers/login';
 
 /**
  * Admin-initiated staff onboarding (e2e, real Postgres).
@@ -25,7 +23,6 @@ import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 describe('Staff onboarding (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
 
   const runId = `onb-${Date.now()}`;
   let panchayatId: string;
@@ -48,9 +45,9 @@ describe('Staff onboarding (e2e)', () => {
   const asAdmin = (r: request.Test) => r.set('Cookie', admin.cookie);
 
   async function login(phone: string): Promise<{ cookie: string; userId: string }> {
-    await api().post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
-    const verify = await api().post('/api/v1/auth/verify-otp').send({ phone, code });
+    const verify = await api()
+      .post('/api/v1/auth/verify-token')
+      .send({ accessToken: mockAccessToken(phone) });
     const setCookie = verify.get('Set-Cookie');
     const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
     const cookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
@@ -76,7 +73,6 @@ describe('Staff onboarding (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
 
     const panchayat = await prisma.panchayat.create({
       data: { code: `${runId}-p`, name: 'Onb Panchayat', nameMl: 'ml' },
@@ -141,7 +137,7 @@ describe('Staff onboarding (e2e)', () => {
 
   // ---- Initiate + pending grants no access -------------------------------
 
-  it('initiates onboarding for a NEW phone: pending, no user, no assignment, onboarding-purpose OTP', async () => {
+  it('initiates onboarding for a NEW phone: pending, no user, no assignment (OTP sent by the widget)', async () => {
     const phone = freshPhone();
     const res = await initiate({ phone, role: 'REPRESENTATIVE', wardIds: [ward1Id] });
     expect([200, 201]).toContain(res.status);
@@ -149,16 +145,10 @@ describe('Staff onboarding (e2e)', () => {
     expect(res.body.status).toBe('pending');
     expect(res.body.userExists).toBe(false);
 
-    // Pending grants no access: no user account, no role assignment yet.
+    // Pending grants no access: no user account, no role assignment yet. The
+    // OTP itself is sent client-side by the MSG91 widget (no server challenge).
     expect(await prisma.user.findUnique({ where: { phone } })).toBeNull();
     expect(await prisma.roleAssignment.count({ where: { wardId: ward1Id, revokedAt: null } })).toBe(0);
-
-    // OTP was issued under the onboarding purpose, NOT login.
-    const onbChallenge = await prisma.otpChallenge.findFirst({
-      where: { phone, purpose: ONBOARDING_PURPOSE },
-    });
-    expect(onbChallenge).not.toBeNull();
-    expect(await prisma.otpChallenge.count({ where: { phone, purpose: 'login' } })).toBe(0);
   });
 
   it('prevents a second pending onboarding for the same phone', async () => {
@@ -189,8 +179,7 @@ describe('Staff onboarding (e2e)', () => {
     const init = await initiate({ phone, role: 'REPRESENTATIVE', wardIds: [ward1Id, ward2Id] });
     const id = track(init);
 
-    const code = sms.lastCodeFor(phone);
-    const verify = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ code });
+    const verify = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ accessToken: mockAccessToken(phone) });
     expect(verify.status).toBe(200);
     expect(verify.body.status).toBe('verified');
 
@@ -204,7 +193,7 @@ describe('Staff onboarding (e2e)', () => {
     expect(user!.roleAssignments.some((r) => r.role !== 'REPRESENTATIVE')).toBe(false);
 
     // Replay the same verify → idempotent (no duplicate assignments, still verified).
-    const replay = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ code });
+    const replay = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ accessToken: mockAccessToken(phone) });
     expect(replay.status).toBe(200);
     expect(replay.body.status).toBe('verified');
     const after = await prisma.roleAssignment.count({ where: { userId: user!.id, revokedAt: null } });
@@ -218,7 +207,7 @@ describe('Staff onboarding (e2e)', () => {
   it('rejects a wrong OTP and keeps the onboarding pending', async () => {
     const phone = freshPhone();
     const id = track(await initiate({ phone, role: 'COORDINATOR', panchayatIds: [panchayatId] }));
-    const bad = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ code: '000000' });
+    const bad = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ accessToken: 'bad-token-not-prefixed' });
     expect(bad.status).toBe(401);
     const row = await prisma.staffOnboarding.findUnique({ where: { id } });
     expect(row?.status).toBe('pending');
@@ -230,8 +219,7 @@ describe('Staff onboarding (e2e)', () => {
     const id = track(await initiate({ phone, role: 'REPRESENTATIVE', wardIds: [ward1Id] }));
     // Force the onboarding window (and its OTP) into the past.
     await prisma.staffOnboarding.update({ where: { id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    const code = sms.lastCodeFor(phone);
-    const res = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ code });
+    const res = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ accessToken: mockAccessToken(phone) });
     expect(res.status).toBe(409);
     const row = await prisma.staffOnboarding.findUnique({ where: { id } });
     expect(row?.status).toBe('expired');
@@ -239,11 +227,15 @@ describe('Staff onboarding (e2e)', () => {
 
   // ---- Resend cooldown + cancel ------------------------------------------
 
-  it('enforces the resend cooldown', async () => {
+  it('resend extends the pending window (MSG91 widget owns the actual resend + cooldown)', async () => {
     const phone = freshPhone();
     const id = track(await initiate({ phone, role: 'REPRESENTATIVE', wardIds: [ward1Id] }));
+    const before = await prisma.staffOnboarding.findUnique({ where: { id } });
     const resend = await asAdmin(api().post(`/api/v1/onboarding/${id}/resend`));
-    expect(resend.status).toBe(429);
+    expect(resend.status).toBe(200);
+    const after = await prisma.staffOnboarding.findUnique({ where: { id } });
+    expect(after!.expiresAt.getTime()).toBeGreaterThanOrEqual(before!.expiresAt.getTime());
+    expect(await prisma.auditLog.count({ where: { action: 'staff.onboarding_resent', entityId: id } })).toBe(1);
   });
 
   it('cancels a pending onboarding; verification then fails', async () => {
@@ -252,8 +244,7 @@ describe('Staff onboarding (e2e)', () => {
     const cancel = await asAdmin(api().post(`/api/v1/onboarding/${id}/cancel`));
     expect(cancel.status).toBe(200);
     expect(cancel.body.status).toBe('cancelled');
-    const code = sms.lastCodeFor(phone);
-    const verify = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ code });
+    const verify = await asAdmin(api().post(`/api/v1/onboarding/${id}/verify`)).send({ accessToken: mockAccessToken(phone) });
     expect(verify.status).toBe(409);
     // No assignment was created.
     const user = await prisma.user.findUnique({ where: { phone } });
@@ -266,8 +257,9 @@ describe('Staff onboarding (e2e)', () => {
     const idA = track(await initiate({ phone: phoneA, role: 'COORDINATOR', panchayatIds: [panchayatId] }));
     const idB = track(await initiate({ phone: phoneB, role: 'REPRESENTATIVE', wardIds: [ward1Id] }));
 
-    const code = sms.lastCodeFor(phoneA);
-    await asAdmin(api().post(`/api/v1/onboarding/${idA}/verify`)).send({ code }).expect(200);
+    await asAdmin(api().post(`/api/v1/onboarding/${idA}/verify`))
+      .send({ accessToken: mockAccessToken(phoneA) })
+      .expect(200);
 
     // B stays pending; its phone still has no user/assignment.
     const rowB = await prisma.staffOnboarding.findUnique({ where: { id: idB } });

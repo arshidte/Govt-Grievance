@@ -1,12 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { requestOtpSchema, type RequestOtpInput } from '@pg/types';
 import { Alert, Button, Input } from '@pg/ui';
 
-import { useAuth } from './useAuth';
+import { sendOtp } from './otpWidget';
 
 /** Maps a raw Zod issue message (the regex schemas' custom message string, e.g. `invalid_phone`) to an i18n key. */
 const ZOD_MESSAGE_KEY: Record<string, string> = {
@@ -26,7 +27,8 @@ export interface LoginFormProps {
  */
 export function LoginForm({ onRequested }: LoginFormProps) {
   const t = useTranslations();
-  const { requestOtp } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
 
   const {
     register,
@@ -37,10 +39,20 @@ export function LoginForm({ onRequested }: LoginFormProps) {
     defaultValues: { phone: '' },
   });
 
-  const onSubmit = handleSubmit((data) => {
-    requestOtp.mutate(data, {
-      onSuccess: () => onRequested?.(data.phone),
-    });
+  // The MSG91 widget sends the OTP (no server request-otp call). On success we
+  // advance to the code-entry step; a widget/send error shows the same
+  // "request failed" alert the old mutation did.
+  const onSubmit = handleSubmit(async (data) => {
+    setSendFailed(false);
+    setSending(true);
+    try {
+      await sendOtp(data.phone);
+      onRequested?.(data.phone);
+    } catch {
+      setSendFailed(true);
+    } finally {
+      setSending(false);
+    }
   });
 
   const phoneError = errors.phone?.message;
@@ -61,11 +73,11 @@ export function LoginForm({ onRequested }: LoginFormProps) {
         {...register('phone')}
       />
 
-      {requestOtp.isError && (
+      {sendFailed && (
         <Alert variant="error" title={t('auth.requestFailed')} />
       )}
 
-      <Button type="submit" loading={requestOtp.isPending} data-testid="login-submit">
+      <Button type="submit" loading={sending} data-testid="login-submit">
         {t('auth.sendOtp')}
       </Button>
     </form>

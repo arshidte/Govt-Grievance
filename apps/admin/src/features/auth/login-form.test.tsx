@@ -9,27 +9,13 @@ import enMessages from '@pg/i18n/messages/en.json';
 import { LoginForm } from './LoginForm';
 
 /**
- * Mirrors the citizen app's `src/features/auth/login-form.test.tsx`. Mocks
- * `useAuth` (not the underlying `@pg/api-client` hooks or fetch) so we can
- * assert, in isolation, whether `requestOtp.mutate` was called — the exact
- * behavior this test exists to pin down (TDD RED->GREEN gate per ruling
- * R15): a BAD phone must show the translated `invalid_phone` field error
- * and must NOT call the mutation; a VALID phone MUST call it.
+ * Mocks the MSG91 widget's `sendOtp` (not fetch) so we can assert, in
+ * isolation, that a BAD phone shows the translated `invalid_phone` field error
+ * and does NOT dispatch the widget, while a VALID phone sends the OTP and
+ * advances (`onRequested`).
  */
-const mutate = vi.fn();
-
-vi.mock('./useAuth', () => ({
-  useAuth: () => ({
-    requestOtp: {
-      mutate,
-      isPending: false,
-      isError: false,
-      isSuccess: false,
-    },
-    verifyOtp: { mutate: vi.fn(), isPending: false, isError: false, isSuccess: false },
-    logout: { mutate: vi.fn(), isPending: false, isError: false, isSuccess: false },
-  }),
-}));
+const sendOtp = vi.fn().mockResolvedValue(undefined);
+vi.mock('./otpWidget', () => ({ sendOtp: (...args: unknown[]) => sendOtp(...args) }));
 
 function renderWithIntl(children: ReactNode) {
   return render(
@@ -41,37 +27,31 @@ function renderWithIntl(children: ReactNode) {
 
 describe('LoginForm', () => {
   beforeEach(() => {
-    mutate.mockClear();
+    sendOtp.mockClear();
   });
 
-  it('shows the translated invalid_phone field error and does NOT call the mutation for a bad phone', async () => {
+  it('shows the translated invalid_phone field error and does NOT send for a bad phone', async () => {
     const user = userEvent.setup();
     renderWithIntl(<LoginForm />);
 
-    const phoneInput = screen.getByLabelText(/mobile number/i);
-    await user.type(phoneInput, '12345');
+    await user.type(screen.getByLabelText(/mobile number/i), '12345');
     await user.click(screen.getByRole('button', { name: /send otp/i }));
 
     await waitFor(() => {
       expect(screen.getByText(enMessages.auth.invalidPhone)).toBeInTheDocument();
     });
-    expect(mutate).not.toHaveBeenCalled();
+    expect(sendOtp).not.toHaveBeenCalled();
   });
 
-  it('calls the requestOtp mutation for a valid phone', async () => {
+  it('sends the OTP via the widget and advances for a valid phone', async () => {
+    const onRequested = vi.fn();
     const user = userEvent.setup();
-    renderWithIntl(<LoginForm />);
+    renderWithIntl(<LoginForm onRequested={onRequested} />);
 
-    const phoneInput = screen.getByLabelText(/mobile number/i);
-    await user.type(phoneInput, '+919876543210');
+    await user.type(screen.getByLabelText(/mobile number/i), '+919876543210');
     await user.click(screen.getByRole('button', { name: /send otp/i }));
 
-    await waitFor(() => {
-      expect(mutate).toHaveBeenCalledTimes(1);
-    });
-    expect(mutate).toHaveBeenCalledWith(
-      { phone: '+919876543210' },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
+    await waitFor(() => expect(sendOtp).toHaveBeenCalledWith('+919876543210'));
+    await waitFor(() => expect(onRequested).toHaveBeenCalledWith('+919876543210'));
   });
 });

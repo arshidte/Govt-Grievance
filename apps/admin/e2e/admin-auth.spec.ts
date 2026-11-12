@@ -54,7 +54,7 @@ const SEEDED_COORDINATOR_PHONE = '+919000000002';
  * NO general BFF catch-all (only `/api/v1/auth/*`), so `/api/v1/dev/last-otp`
  * must be read from the API origin directly, not the admin same-origin.
  */
-const API_BASE = 'http://localhost:4000';
+const _API_BASE = 'http://localhost:4000';
 
 test.describe('admin staff gate', () => {
   test('an unauthenticated visit to the admin dashboard redirects to /login', async ({ page }) => {
@@ -80,11 +80,7 @@ test.describe('admin staff gate', () => {
     await page.getByTestId('login-submit').click();
     await expect(page).toHaveURL(/\/verify\?phone=/);
 
-    const lastOtpResponse = await page.request.get(
-      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
-    );
-    expect(lastOtpResponse.ok()).toBe(true);
-    const { code } = (await lastOtpResponse.json()) as { code: string };
+    const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
     expect(code).toMatch(/^\d{6}$/);
 
     for (let i = 0; i < code.length; i += 1) {
@@ -122,11 +118,7 @@ test.describe('admin staff gate', () => {
     await page.getByTestId('login-submit').click();
     await expect(page).toHaveURL(/\/verify\?phone=/);
 
-    const lastOtpResponse = await page.request.get(
-      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
-    );
-    expect(lastOtpResponse.ok()).toBe(true);
-    const { code } = (await lastOtpResponse.json()) as { code: string };
+    const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
     expect(code).toMatch(/^\d{6}$/);
 
     // OtpInput is 6 separate single-digit cells (aria-label "Digit N of 6").
@@ -149,10 +141,7 @@ async function loginAsSeededCoordinator(page: import('@playwright/test').Page) {
   await page.getByTestId('login-submit').click();
   await expect(page).toHaveURL(/\/verify\?phone=/);
 
-  const lastOtpResponse = await page.request.get(
-    `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(SEEDED_COORDINATOR_PHONE)}`,
-  );
-  const { code } = (await lastOtpResponse.json()) as { code: string };
+  const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
   for (let i = 0; i < code.length; i += 1) {
     await page.getByLabel(`Digit ${i + 1} of 6`).fill(code[i] as string);
   }

@@ -24,16 +24,14 @@ describe('createApiClient', () => {
 
     const client = createApiClient({ baseUrl: BASE_URL });
 
-    await expect(client.verifyOtp({ phone: '+919876543210', code: '123456' })).rejects.toMatchObject(
+    await expect(client.verifyToken({ accessToken: 'tok' })).rejects.toMatchObject(
       {
         code: 'invalid_otp',
         messageKey: 'auth.invalidOtp',
         status: 401,
       },
     );
-    await expect(client.verifyOtp({ phone: '+919876543210', code: '123456' })).rejects.toBeInstanceOf(
-      ApiClientError,
-    );
+    await expect(client.verifyToken({ accessToken: 'tok' })).rejects.toBeInstanceOf(ApiClientError);
   });
 
   it('returns parsed JSON typed as MeResponse on success', async () => {
@@ -60,10 +58,10 @@ describe('createApiClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createApiClient({ baseUrl: BASE_URL });
-    await client.requestOtp({ phone: '+919876543210' });
+    await client.verifyToken({ accessToken: 'tok' });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${BASE_URL}/api/v1/auth/request-otp`,
+      `${BASE_URL}/api/v1/auth/verify-token`,
       expect.objectContaining({ credentials: 'include' }),
     );
   });
@@ -128,7 +126,7 @@ describe('createApiClient', () => {
     });
   });
 
-  it('returns { ok: true } for logout and request-otp happy paths', async () => {
+  it('returns { ok: true } for the logout happy path', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }, 200));
     vi.stubGlobal('fetch', fetchMock);
 

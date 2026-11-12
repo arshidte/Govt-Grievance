@@ -47,13 +47,10 @@ const envSchema = z.object({
   CORS_ORIGIN_ADMIN: z.string().min(1).default('http://localhost:3001'),
   SESSION_COOKIE_NAME: z.string().min(1).default('pg_session'),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(720),
+  // Validity window (seconds) of a pending staff-onboarding record — how long
+  // the admin has to verify the MSG91 OTP after initiating. (Login OTP lifetime
+  // is owned by MSG91, not this value.)
   OTP_TTL_SECONDS: z.coerce.number().int().positive().default(300),
-  OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
-  OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: z.coerce.number().int().positive().default(5),
-  // Minimum seconds between consecutive onboarding-OTP sends for one
-  // onboarding record (resend cooldown). Has a default, so existing .env
-  // files need no change; onboarding-only, never affects login OTP.
-  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
   // Per-IP request limit for `/auth/*` routes within a 60s window, enforced
   // by the global throttler (see src/common/throttler.config.ts, which now
   // sources this validated value so there is ONE config contract). The
@@ -67,7 +64,21 @@ const envSchema = z.object({
   // Task 12 / spec §9). Fail-safe default of 20; enforced per-rep with a
   // DB-backed counter that FAILS CLOSED if the count query errors.
   ON_BEHALF_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
-  SMS_PROVIDER: z.string().min(1).default('mock'),
+  // MSG91 OTP widget integration. Login + staff-onboarding verification are
+  // driven by the MSG91 browser widget; the server validates the widget's
+  // access token via `verifyAccessToken`. `mock` (dev/test) uses an in-process
+  // verifier that trusts a `test-otp:<phone>` token so the suite can mint
+  // sessions without the external service; `live` calls MSG91 with
+  // `MSG91_AUTHKEY`.
+  MSG91_PROVIDER: z.enum(['mock', 'live']).default('mock'),
+  // Server-side secret (MSG91 "authkey") — required only when MSG91_PROVIDER=live.
+  // NEVER commit a real value; supply via the deployment secret store.
+  MSG91_AUTHKEY: z.string().min(1).optional(),
+  // MSG91 server verify endpoint (override only for testing/self-host).
+  MSG91_VERIFY_URL: z
+    .string()
+    .url()
+    .default('https://control.msg91.com/api/v5/widget/verifyAccessToken'),
   // Filesystem root for the local-disk attachment storage provider (M2
   // Task 14 / spec §10, ruling R-ENV). MUST resolve OUTSIDE any app's
   // public/static web root — it is served only via the authenticated
@@ -76,16 +87,23 @@ const envSchema = z.object({
   // Local-disk storage is DEVELOPMENT-ONLY; see `local-disk.storage.ts`.
   ATTACHMENT_STORAGE_DIR: z.string().min(1).default('.data/attachments'),
 }).superRefine((e, ctx) => {
-  // Fail closed: the in-memory mock SMS provider must never run in
-  // production. SMS_PROVIDER defaults to 'mock', so an unset value in a
-  // production deploy would otherwise silently ship a non-delivering
-  // provider that also retains codes in memory. Reject it at boot.
-  if (e.NODE_ENV === 'production' && e.SMS_PROVIDER === 'mock') {
+  // Fail closed: the in-process MOCK MSG91 verifier (which trusts a
+  // `test-otp:<phone>` token) must never run in production. MSG91_PROVIDER
+  // defaults to 'mock', so an unset value in a production deploy would
+  // otherwise ship a verifier that accepts forged tokens. Reject it at boot.
+  if (e.NODE_ENV === 'production' && e.MSG91_PROVIDER !== 'live') {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['SMS_PROVIDER'],
-      message:
-        'SMS_PROVIDER must not be "mock" in production — configure a real SMS provider.',
+      path: ['MSG91_PROVIDER'],
+      message: 'MSG91_PROVIDER must be "live" in production (the mock verifier accepts forged tokens).',
+    });
+  }
+  // The live verifier cannot authenticate to MSG91 without the authkey.
+  if (e.MSG91_PROVIDER === 'live' && !e.MSG91_AUTHKEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['MSG91_AUTHKEY'],
+      message: 'MSG91_AUTHKEY is required when MSG91_PROVIDER="live".',
     });
   }
 

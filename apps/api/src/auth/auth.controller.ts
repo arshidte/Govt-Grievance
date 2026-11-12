@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { requestOtpSchema, verifyOtpSchema, type MeResponse } from '@pg/types';
+import { verifyTokenSchema, type MeResponse, type VerifyTokenInput } from '@pg/types';
 import type { Request, Response } from 'express';
 
 import { AuditService } from '../audit/audit.service';
@@ -13,7 +13,7 @@ import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { buildClearSessionCookie, buildSessionCookie, SESSION_COOKIE_NAME } from './cookie.util';
 import { CurrentUser } from './current-user.decorator';
-import { OtpService } from './otp.service';
+import { MSG91_VERIFIER, type Msg91Verifier } from './msg91/msg91-verifier.interface';
 import { SessionService, type SessionUser } from './session.service';
 
 /**
@@ -31,73 +31,45 @@ import { SessionService, type SessionUser } from './session.service';
 @Controller('auth')
 export class AuthController {
   constructor(
-    private readonly otp: OtpService,
+    @Inject(MSG91_VERIFIER) private readonly verifier: Msg91Verifier,
     private readonly sessions: SessionService,
     private readonly auth: AuthService,
     private readonly audit: AuditService,
   ) {}
 
   /**
-   * Issues (and SMS's) an OTP challenge for `phone`. Always returns the same
-   * neutral 202 body regardless of whether `phone` has an account —
-   * `OtpService.request` itself never looks up account existence, so there
-   * is nothing here to leak either. Rate limiting is enforced inside
-   * `OtpService.request` (throws `ApiError('rate_limited', 429, ...)`,
-   * handled uniformly by the global exception filter).
+   * MSG91 widget login. The browser widget has already sent + verified the OTP
+   * and produced an opaque access token; the client posts ONLY that token. The
+   * server validates it with MSG91 (`Msg91Verifier.verifyAccessToken`) and uses
+   * the phone MSG91 vouches for — NEVER a client-supplied phone. On success:
+   * resolves/creates the `User` (new phones get a citizen-only identity — see
+   * `AuthService.findOrCreateCitizenByPhone`), opens a session recording the
+   * caller's IP/user-agent, sets the session cookie, and returns `MeResponse`.
+   * A rejected token throws a uniform 401 BEFORE any user/session/cookie is
+   * created; MSG91 being unreachable surfaces a 503.
    */
-  @Post('request-otp')
-  @HttpCode(202)
-  async requestOtp(
-    @Body(new ZodValidationPipe(requestOtpSchema)) body: { phone: string },
-  ): Promise<{ ok: true }> {
-    await this.otp.request(body.phone);
-
-    await this.audit.record({
-      action: 'otp.requested',
-      entityType: 'User',
-      metadata: { phoneMasked: maskPhone(body.phone) },
-    });
-
-    return { ok: true };
-  }
-
-  /**
-   * Verifies the OTP code for `phone`. On success: resolves/creates the
-   * `User` (new phones get a citizen-only identity — see
-   * `AuthService.findOrCreateCitizenByPhone`), opens a new session recording
-   * the caller's IP/user-agent, sets the session cookie on the response, and
-   * returns the `MeResponse`. `OtpService.verify` throws a uniform 401 for
-   * every failure mode (wrong code, expired, consumed, exhausted) before any
-   * of this runs, so a failed verification never creates a user, a session,
-   * or a cookie.
-   */
-  @Post('verify-otp')
+  @Post('verify-token')
   @HttpCode(200)
-  async verifyOtp(
-    @Body(new ZodValidationPipe(verifyOtpSchema)) body: { phone: string; code: string },
+  async verifyToken(
+    @Body(new ZodValidationPipe(verifyTokenSchema)) body: VerifyTokenInput,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<MeResponse> {
-    const phoneMasked = maskPhone(body.phone);
-
+    let phone: string;
     try {
-      await this.otp.verify(body.phone, body.code);
+      ({ phone } = await this.verifier.verifyAccessToken(body.accessToken));
     } catch (err) {
       if (err instanceof ApiError) {
-        // Audit the failure, then re-throw the SAME uniform error unchanged
-        // (see OtpService.verify doc) — the non-disclosure contract must
-        // not be affected by auditing.
-        await this.audit.record({
-          action: 'otp.failed',
-          entityType: 'User',
-          metadata: { phoneMasked },
-          ip: req.ip,
-        });
+        // Audit the failed verification (no verified phone to attribute/mask),
+        // then re-throw the SAME uniform error unchanged — the non-disclosure
+        // contract must not be affected by auditing.
+        await this.audit.record({ action: 'otp.failed', entityType: 'User', ip: req.ip });
       }
       throw err;
     }
 
-    const user = await this.auth.findOrCreateCitizenByPhone(body.phone);
+    const phoneMasked = maskPhone(phone);
+    const user = await this.auth.findOrCreateCitizenByPhone(phone);
 
     await this.audit.record({
       actorUserId: user.id,

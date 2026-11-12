@@ -20,14 +20,13 @@ import type {
   PanchayatDTO,
   RepresentativeAssignmentDTO,
   RepresentativeDTO,
-  RequestOtpInput,
   StaffOnboardingDTO,
   StaffUserDTO,
   TransitionInput,
   UpdatePanchayatInput,
   UpdateProfileInput,
   UpdateWardInput,
-  VerifyOtpInput,
+  VerifyTokenInput,
   WardDTO,
 } from '@pg/types';
 
@@ -96,8 +95,8 @@ export interface CreateApiClientOptions {
 }
 
 export interface ApiClient {
-  requestOtp(input: RequestOtpInput): Promise<OkResponse>;
-  verifyOtp(input: VerifyOtpInput): Promise<MeResponse>;
+  /** MSG91 widget login: exchange a verified access token for a session. */
+  verifyToken(input: VerifyTokenInput): Promise<MeResponse>;
   logout(): Promise<OkResponse>;
   getMe(): Promise<MeResponse>;
   getCategories(): Promise<CategoryDTO[]>;
@@ -131,7 +130,7 @@ export interface ApiClient {
   listOnboardings(status?: string): Promise<StaffOnboardingDTO[]>;
   getOnboarding(id: string): Promise<StaffOnboardingDTO>;
   resendOnboarding(id: string): Promise<StaffOnboardingDTO>;
-  verifyOnboarding(id: string, code: string): Promise<StaffOnboardingDTO>;
+  verifyOnboarding(id: string, accessToken: string): Promise<StaffOnboardingDTO>;
   cancelOnboarding(id: string): Promise<StaffOnboardingDTO>;
   createIssue(input: CreateIssueInput, idempotencyKey?: string): Promise<IssueDetailDTO>;
   createOnBehalf(input: CreateOnBehalfInput, idempotencyKey?: string): Promise<OnBehalfResult>;
@@ -208,14 +207,8 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
   }
 
   return {
-    requestOtp: (input) =>
-      request<OkResponse>('/auth/request-otp', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      }),
-
-    verifyOtp: (input) =>
-      request<MeResponse>('/auth/verify-otp', {
+    verifyToken: (input) =>
+      request<MeResponse>('/auth/verify-token', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
@@ -336,10 +329,10 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     resendOnboarding: (id) =>
       request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}/resend`, { method: 'POST' }),
 
-    verifyOnboarding: (id, code) =>
+    verifyOnboarding: (id, accessToken) =>
       request<StaffOnboardingDTO>(`/onboarding/${encodeURIComponent(id)}/verify`, {
         method: 'POST',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ accessToken }),
       }),
 
     cancelOnboarding: (id) =>

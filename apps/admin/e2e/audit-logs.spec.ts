@@ -7,14 +7,12 @@ import { test, expect, type Browser, type Page } from '@playwright/test';
  * (Forbidden state) — proving the data is Global-Admin-only via the BFF/API,
  * not just hidden in nav.
  */
-const API_BASE = 'http://localhost:4000';
+const _API_BASE = 'http://localhost:4000';
 const SEEDED_ADMIN_PHONE = '+919000000001';
 const SEEDED_COORDINATOR_PHONE = '+919000000002';
 
-async function readOtp(page: Page, phone: string): Promise<string> {
-  const res = await page.request.get(`${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`);
-  expect(res.ok()).toBe(true);
-  const { code } = (await res.json()) as { code: string };
+async function readOtp(_page: Page, _phone: string): Promise<string> {
+  const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
   return code;
 }
 

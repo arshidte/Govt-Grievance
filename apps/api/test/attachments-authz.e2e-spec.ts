@@ -9,8 +9,6 @@ import { STORAGE_PROVIDER, type StorageProvider } from '../src/attachments/stora
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
 /**
  * Task 16 (M2 spec §6, §10): real-HTTP e2e for the attachment endpoints —
@@ -47,7 +45,6 @@ import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 describe('Attachment endpoints authz (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
   let store: StorageProvider;
 
   const runId = `t16-${Date.now()}`;
@@ -78,11 +75,9 @@ describe('Attachment endpoints authz (e2e)', () => {
 
   /** Logs a brand-new citizen phone in via the real OTP flow; returns its session cookie + user id. */
   async function login(phone: string): Promise<{ cookie: string; userId: string }> {
-    await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
     const verifyResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/verify-otp')
-      .send({ phone, code });
+      .post('/api/v1/auth/verify-token')
+      .send({ accessToken: `test-otp:${phone}` });
 
     const setCookie = verifyResponse.get('Set-Cookie');
     const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
@@ -130,7 +125,6 @@ describe('Attachment endpoints authz (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
     store = moduleFixture.get(STORAGE_PROVIDER);
 
     const category = await prisma.category.create({

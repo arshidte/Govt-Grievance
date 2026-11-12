@@ -9,8 +9,6 @@ import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { purgeAuditLogs } from './helpers/append-only';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
 /**
  * Organization-management milestone (e2e, real Postgres).
@@ -26,7 +24,6 @@ import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 describe('Organization management (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
 
   const runId = `org-${Date.now()}`;
 
@@ -47,11 +44,9 @@ describe('Organization management (e2e)', () => {
   }
 
   async function login(phone: string): Promise<{ cookie: string; userId: string }> {
-    await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
     const verify = await request(app.getHttpServer())
-      .post('/api/v1/auth/verify-otp')
-      .send({ phone, code });
+      .post('/api/v1/auth/verify-token')
+      .send({ accessToken: `test-otp:${phone}` });
     const setCookie = verify.get('Set-Cookie');
     const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
     const cookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
@@ -74,7 +69,6 @@ describe('Organization management (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
 
     const category = await prisma.category.create({
       data: { slug: `${runId}-cat`, name: 'Roads', nameMl: 'റോഡുകൾ' },

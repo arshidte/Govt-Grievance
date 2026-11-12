@@ -17,17 +17,13 @@ import { test, expect, type Page } from '@playwright/test';
  * create (soft-revoked rows grant nothing), leaving seeded staff unaffected.
  */
 
-const API_BASE = 'http://localhost:4000';
+const _API_BASE = 'http://localhost:4000';
 const SEEDED_ADMIN_PHONE = '+919000000001';
 const EXISTING_USER_A = '+919000000002'; // seeded COORDINATOR user (existing account)
 const EXISTING_USER_B = '+919000000003'; // seeded REPRESENTATIVE user (existing account)
 
-async function readLastOtp(page: Page, phone: string): Promise<string> {
-  const res = await page.request.get(
-    `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
-  );
-  expect(res.ok()).toBe(true);
-  const { code } = (await res.json()) as { code: string };
+async function readLastOtp(_page: Page, _phone: string): Promise<string> {
+  const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
   expect(code).toMatch(/^\d{6}$/);
   return code;
 }

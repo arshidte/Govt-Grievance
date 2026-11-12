@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { OnboardingStatus, Prisma, Role, type StaffOnboarding } from '@prisma/client';
 import type {
   InitiateOnboardingInput,
@@ -6,15 +6,11 @@ import type {
   StaffOnboardingDTO,
 } from '@pg/types';
 
+import { MSG91_VERIFIER, type Msg91Verifier } from '../auth/msg91/msg91-verifier.interface';
 import { AuditService } from '../audit/audit.service';
 import { ApiError } from '../common/api-error';
 import { env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
-
-import { OtpService } from '../auth/otp.service';
-
-/** Dedicated OTP purpose so an onboarding code can never satisfy a login (and vice versa). */
-export const ONBOARDING_PURPOSE = 'staff_onboarding';
 
 /**
  * Admin-initiated staff onboarding (staff-onboarding milestone).
@@ -31,7 +27,7 @@ export const ONBOARDING_PURPOSE = 'staff_onboarding';
 export class StaffOnboardingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly otp: OtpService,
+    @Inject(MSG91_VERIFIER) private readonly verifier: Msg91Verifier,
     private readonly audit: AuditService,
   ) {}
 
@@ -116,34 +112,19 @@ export class StaffOnboardingService {
       throw err;
     }
 
-    // Send the onboarding OTP (purpose-scoped; rate-limited per phone+purpose).
-    await this.otp.request(dto.phone, ONBOARDING_PURPOSE);
-
+    // No server-side OTP send: with the MSG91 integration the admin's browser
+    // runs the widget against `dto.phone` to send + verify the code, then
+    // posts the resulting access token to `verify()` below.
     return this.toDTO(onboarding);
   }
 
   async resend(actorUserId: string, id: string): Promise<StaffOnboardingDTO> {
-    const onboarding = await this.getPendingOrThrow(id);
+    await this.getPendingOrThrow(id); // validates it exists AND is pending
 
-    // Resend cooldown: block if the last onboarding challenge for this phone
-    // was sent within the cooldown window.
-    const lastChallenge = await this.prisma.otpChallenge.findFirst({
-      where: { phone: onboarding.phone, purpose: ONBOARDING_PURPOSE },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (lastChallenge) {
-      const availableAt = new Date(
-        lastChallenge.createdAt.getTime() + env.OTP_RESEND_COOLDOWN_SECONDS * 1000,
-      );
-      if (availableAt > new Date()) {
-        throw new ApiError('resend_cooldown', 429, 'errors.resendCooldown');
-      }
-    }
-
-    // OTP dispatch (external side effect) stays BEFORE the transaction: the
-    // expiry bump should only happen once a fresh code has actually been sent.
-    await this.otp.request(onboarding.phone, ONBOARDING_PURPOSE);
-    // Expiry bump + audit commit atomically (M4D).
+    // The actual OTP resend happens client-side via the MSG91 widget
+    // (`retryOtp`) in the admin's browser; the server only extends the pending
+    // window so the freshly-resent code has time to be verified. The widget
+    // owns resend cooldown / rate limiting.
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.staffOnboarding.update({
         where: { id },
@@ -160,7 +141,7 @@ export class StaffOnboardingService {
     return this.toDTO(updated);
   }
 
-  async verify(actorUserId: string, id: string, code: string): Promise<StaffOnboardingDTO> {
+  async verify(actorUserId: string, id: string, accessToken: string): Promise<StaffOnboardingDTO> {
     const onboarding = await this.prisma.staffOnboarding.findUnique({ where: { id } });
     if (!onboarding) throw new ApiError('onboarding_not_found', 404, 'errors.onboardingNotFound');
 
@@ -179,9 +160,14 @@ export class StaffOnboardingService {
       throw new ApiError('onboarding_not_pending', 409, 'errors.onboardingNotPending');
     }
 
-    // Verify the OTP (purpose-scoped). Throws a uniform invalid_otp on failure;
-    // consumes the challenge on success (replay-safe).
-    await this.otp.verify(onboarding.phone, code, ONBOARDING_PURPOSE);
+    // Validate the MSG91 access token the admin's browser produced for this
+    // onboarding's phone. The server trusts ONLY the phone MSG91 returns and
+    // requires it to match the pending onboarding — never a client-supplied
+    // code/phone. A rejected token throws a uniform 401 before any grant.
+    const { phone: verifiedPhone } = await this.verifier.verifyAccessToken(accessToken);
+    if (verifiedPhone !== onboarding.phone) {
+      throw new ApiError('onboarding_phone_mismatch', 409, 'errors.onboardingPhoneMismatch');
+    }
 
     // Re-validate the target scopes are STILL active at activation time.
     if (onboarding.role === Role.REPRESENTATIVE) {

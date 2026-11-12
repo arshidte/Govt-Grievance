@@ -3,7 +3,7 @@ export type { ApiClient, CreateApiClientOptions, OkResponse, OnBehalfResult } fr
 
 export { queryKeys } from './query-keys';
 
-export { useRequestOtp, useVerifyOtp, useLogout, useMe } from './auth';
+export { useVerifyToken, useLogout, useMe } from './auth';
 export { useCategories } from './catalog';
 export { usePanchayats, useWards } from './org';
 export {

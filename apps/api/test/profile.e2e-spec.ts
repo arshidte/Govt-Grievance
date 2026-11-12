@@ -8,8 +8,6 @@ import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
 
 /**
  * Collision-free phone per test run that satisfies `phoneSchema`
@@ -39,7 +37,6 @@ function extractSessionCookie(response: request.Response): string | undefined {
 describe('Profile (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
 
   const panchayatIds: string[] = [];
   const wardIds: string[] = [];
@@ -49,12 +46,9 @@ describe('Profile (e2e)', () => {
   async function createSession(): Promise<{ cookie: string; userId: string; phone: string }> {
     const phone = freshPhone();
 
-    await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
-
     const verifyResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/verify-otp')
-      .send({ phone, code });
+      .post('/api/v1/auth/verify-token')
+      .send({ accessToken: `test-otp:${phone}` });
 
     const cookie = extractSessionCookie(verifyResponse) as string;
     const userId = verifyResponse.body.id as string;
@@ -75,7 +69,6 @@ describe('Profile (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
 
     const panchayat = await prisma.panchayat.create({
       data: {

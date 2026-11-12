@@ -1,22 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
-import type { MeResponse, RequestOtpInput, VerifyOtpInput } from '@pg/types';
+import type { MeResponse, VerifyTokenInput } from '@pg/types';
 
 import type { ApiClient, OkResponse } from './client';
 import { queryKeys } from './query-keys';
 
-/** Mutation: `POST /auth/request-otp`. Thin wrapper over `client.requestOtp`. */
-export function useRequestOtp(client: ApiClient): UseMutationResult<OkResponse, Error, RequestOtpInput> {
-  return useMutation({
-    mutationFn: (input: RequestOtpInput) => client.requestOtp(input),
-  });
-}
-
-/** Mutation: `POST /auth/verify-otp`. Invalidates `queryKeys.me` on success. */
-export function useVerifyOtp(client: ApiClient): UseMutationResult<MeResponse, Error, VerifyOtpInput> {
+/**
+ * Mutation: `POST /auth/verify-token` (MSG91 widget login). Exchanges the
+ * widget's verified access token for a session cookie. Invalidates
+ * `queryKeys.me` on success.
+ */
+export function useVerifyToken(client: ApiClient): UseMutationResult<MeResponse, Error, VerifyTokenInput> {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: VerifyOtpInput) => client.verifyOtp(input),
+    mutationFn: (input: VerifyTokenInput) => client.verifyToken(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.me });
     },
