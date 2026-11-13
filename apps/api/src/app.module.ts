@@ -11,23 +11,12 @@ import { CatalogModule } from './catalog/catalog.module';
 import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { DEFAULT_THROTTLE_LIMIT, DEFAULT_THROTTLE_TTL_MS } from './common/throttler.config';
 import { env } from './config/env';
-import { DevModule } from './dev/dev.module';
 import { HealthController } from './health/health.controller';
 import { IssuesModule } from './issues/issues.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrgModule } from './org/org.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
-
-/**
- * `DevModule` (the dev-only `GET /api/v1/dev/last-otp` endpoint) is
- * included ONLY when NOT running in production — belt #1 of its
- * production fence (belt #2 is the in-handler guard inside
- * `DevController`). Spreading a conditionally-empty array keeps this a
- * static, synchronous decision made once at module-definition time, same
- * as every other entry in `imports`.
- */
-const conditionalModules = env.NODE_ENV === 'production' ? [] : [DevModule];
 
 @Module({
   imports: [
@@ -58,7 +47,6 @@ const conditionalModules = env.NODE_ENV === 'production' ? [] : [DevModule];
     NotificationsModule,
     OrgModule,
     UsersModule,
-    ...conditionalModules,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],

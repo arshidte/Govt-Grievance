@@ -8,8 +8,6 @@ import { AppModule } from '../src/app.module';
 import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
 /**
  * Task 11 (M2 spec §5.1–5.3, §6): `PATCH /issues/:id/status` with SCOPED staff
@@ -31,7 +29,6 @@ import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 describe('Transition authz (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
 
   const runId = `t11-${Date.now()}`;
 
@@ -63,11 +60,9 @@ describe('Transition authz (e2e)', () => {
 
   /** Logs a brand-new citizen phone in via the real OTP flow; returns its session cookie + user id. */
   async function login(phone: string): Promise<{ cookie: string; userId: string }> {
-    await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
     const verifyResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/verify-otp')
-      .send({ phone, code });
+      .post('/api/v1/auth/verify-token')
+      .send({ accessToken: `test-otp:${phone}` });
 
     const setCookie = verifyResponse.get('Set-Cookie');
     const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
@@ -130,7 +125,6 @@ describe('Transition authz (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
 
     const category = await prisma.category.create({
       data: { slug: `${runId}-cat`, name: 'Roads', nameMl: 'റോഡുകൾ' },

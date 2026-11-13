@@ -63,7 +63,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 
 const CITIZEN = 'http://localhost:3000';
 const ADMIN = 'http://localhost:3001';
-const API = 'http://localhost:4000';
+const _API = 'http://localhost:4000';
 
 /** A phone matching `phoneSchema` (`/^\+91[6-9]\d{9}$/`), distinct per run to avoid OTP/rate-limit collisions across repeated executions. */
 function devPhone(): string {
@@ -94,10 +94,8 @@ const SEEDED_REP_WARD2_PHONE = '+919000000004';
  * both `admin-auth.spec.ts` and the Part A fix to the citizen specs read it
  * the same way.
  */
-async function readLastOtp(page: Page, phone: string): Promise<string> {
-  const response = await page.request.get(`${API}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`);
-  expect(response.ok()).toBe(true);
-  const { code } = (await response.json()) as { code: string };
+async function readLastOtp(_page: Page, _phone: string): Promise<string> {
+  const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
   expect(code).toMatch(/^\d{6}$/);
   return code;
 }

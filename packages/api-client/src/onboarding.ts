@@ -54,14 +54,15 @@ export function useResendOnboarding(
 
 export interface VerifyOnboardingVariables {
   id: string;
-  code: string;
+  /** MSG91 access token from the admin-browser widget targeting the staff phone. */
+  accessToken: string;
 }
 export function useVerifyOnboarding(
   client: ApiClient,
 ): UseMutationResult<StaffOnboardingDTO, Error, VerifyOnboardingVariables> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, code }: VerifyOnboardingVariables) => client.verifyOnboarding(id, code),
+    mutationFn: ({ id, accessToken }: VerifyOnboardingVariables) => client.verifyOnboarding(id, accessToken),
     onSuccess: () => {
       invalidateOnboardings(qc);
       // A verified onboarding creates assignments — refresh the staff lists too.

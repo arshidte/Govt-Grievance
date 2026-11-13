@@ -3,7 +3,7 @@ import { ApiClientError } from '@pg/api-client';
 import enMessages from '@pg/i18n/messages/en.json';
 import mlMessages from '@pg/i18n/messages/ml.json';
 import type { StaffOnboardingDTO } from '@pg/types';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
 import type { ReactNode } from 'react';
@@ -15,7 +15,7 @@ vi.mock('../../auth/api-client', () => ({ useApiClient: () => ({}) }));
 
 let verifyBehavior: 'ok' | 'error' = 'ok';
 const verifyMutate = vi.fn(
-  (_vars: { id: string; code: string }, opts: { onSuccess: () => void; onError: (e: unknown) => void }) => {
+  (_vars: { id: string; accessToken: string }, opts: { onSuccess: () => void; onError: (e: unknown) => void }) => {
     if (verifyBehavior === 'error') opts.onError(new ApiClientError('invalid_otp', 'auth.invalidCode', 401));
     else opts.onSuccess();
   },
@@ -72,9 +72,12 @@ describe('OnboardingOtpModal', () => {
     expect(verifyBtn).toBeEnabled();
     await user.click(verifyBtn);
 
-    expect(verifyMutate).toHaveBeenCalledWith(
-      { id: 'onb-1', code: '123456' },
-      expect.anything(),
+    // In test/dev mode the MSG91 widget yields a `test-otp:<phone>` token.
+    await waitFor(() =>
+      expect(verifyMutate).toHaveBeenCalledWith(
+        { id: 'onb-1', accessToken: 'test-otp:+919000000055' },
+        expect.anything(),
+      ),
     );
     expect(onVerified).toHaveBeenCalled();
   });

@@ -9,8 +9,6 @@ import { SESSION_COOKIE_NAME } from '../src/auth/cookie.util';
 import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { purgeAuditLogs } from './helpers/append-only';
-import type { MockSmsProvider } from '../src/sms/mock-sms.provider';
-import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 
 /**
  * Audit Log read API (M4A, e2e, real Postgres).
@@ -23,7 +21,6 @@ import { SMS_PROVIDER } from '../src/sms/sms-provider.interface';
 describe('Audit log read API (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let sms: MockSmsProvider;
 
   const runId = `auditread-${Date.now()}`;
   const ET = `${runId}-ET`; // main dataset entity type
@@ -49,9 +46,7 @@ describe('Audit log read API (e2e)', () => {
     return `+919${tail}`;
   }
   async function login(phone: string): Promise<{ cookie: string; userId: string }> {
-    await api().post('/api/v1/auth/request-otp').send({ phone });
-    const code = sms.lastCodeFor(phone);
-    const verify = await api().post('/api/v1/auth/verify-otp').send({ phone, code });
+    const verify = await api().post('/api/v1/auth/verify-token').send({ accessToken: `test-otp:${phone}` });
     const setCookie = verify.get('Set-Cookie');
     const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
     const cookie = cookies.find((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`));
@@ -72,7 +67,6 @@ describe('Audit log read API (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
-    sms = moduleFixture.get(SMS_PROVIDER);
 
     // Main dataset: N rows, distinct ascending timestamps (base + i minutes).
     for (let i = 0; i < N; i += 1) {

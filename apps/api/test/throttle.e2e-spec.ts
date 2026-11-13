@@ -44,29 +44,28 @@ describe('Throttle (e2e)', () => {
   });
 
   /**
-   * Proves Review Focus #5 is pinned at the HTTP edge (this task), not at
-   * `OtpService`'s per-phone hourly limit (Task 9). Both throw the SAME
-   * `ApiError('rate_limited', 429, 'auth.tooMany')`, so to attribute the 429
-   * to the per-IP HTTP throttle specifically, every request below uses a
-   * DIFFERENT phone (same client/IP) — the per-phone counter in
-   * `OtpService.request` never approaches its own limit, so if we see 429s
-   * here they can only come from the global `ThrottlerGuard`'s per-IP count
-   * on `/auth/*`.
+   * Proves the per-IP HTTP throttle is pinned on the auth surface. Every
+   * request below uses a DIFFERENT phone (and thus a different mock access
+   * token) from the SAME client/IP, so a 429 can only come from the global
+   * `ThrottlerGuard`'s per-IP count on `/auth/*` — there is no per-phone server
+   * limit anymore (MSG91 owns send/verify rate limiting). Allowed verify-token
+   * calls mint sessions (200); the overflow is throttled (429 auth.tooMany).
    */
-  it('hammering POST /auth/request-otp with varying phones trips the per-IP auth throttle -> 429 auth.tooMany', async () => {
+  it('hammering POST /auth/verify-token with varying tokens trips the per-IP auth throttle -> 429 auth.tooMany', async () => {
     const attempts = AUTH_THROTTLE_LIMIT + 3;
     const responses = [];
 
     for (let i = 0; i < attempts; i += 1) {
+      const phone = freshPhone();
       responses.push(
         // eslint-disable-next-line no-await-in-loop
         await request(app.getHttpServer())
-          .post('/api/v1/auth/request-otp')
-          .send({ phone: freshPhone() }),
+          .post('/api/v1/auth/verify-token')
+          .send({ accessToken: `test-otp:${phone}` }),
       );
     }
 
-    const allowed = responses.filter((r) => r.status === 202);
+    const allowed = responses.filter((r) => r.status === 200);
     const limited = responses.filter((r) => r.status === 429);
 
     expect(allowed.length).toBeLessThanOrEqual(AUTH_THROTTLE_LIMIT);

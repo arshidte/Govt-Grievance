@@ -52,9 +52,16 @@ export const initiateOnboardingSchema = z
   });
 export type InitiateOnboardingInput = z.infer<typeof initiateOnboardingSchema>;
 
-/** Verify onboarding OTP (admin enters the code the staff member received). */
+/**
+ * Verify onboarding via an MSG91 access token (MSG91 integration). The admin's
+ * browser runs the MSG91 widget against the STAFF member's phone (send → the
+ * staff receives the OTP → admin enters it → widget returns an access token);
+ * the admin posts that token here. The server validates the token with MSG91
+ * and confirms the verified phone matches the onboarding record — it never
+ * trusts a client-supplied code/phone.
+ */
 export const verifyOnboardingSchema = z.object({
-  code: z.string().regex(/^\d{6}$/, 'invalid_code'),
+  accessToken: z.string().min(1, 'invalid_token'),
 });
 export type VerifyOnboardingInput = z.infer<typeof verifyOnboardingSchema>;
 

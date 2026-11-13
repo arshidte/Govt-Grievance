@@ -74,7 +74,7 @@ export class StaffOnboardingController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(verifyOnboardingSchema)) dto: VerifyOnboardingInput,
   ): Promise<StaffOnboardingDTO> {
-    return this.onboarding.verify(user.id, id, dto.code);
+    return this.onboarding.verify(user.id, id, dto.accessToken);
   }
 
   @Post(':id/cancel')

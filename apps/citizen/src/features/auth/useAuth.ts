@@ -1,32 +1,29 @@
 'use client';
 
-import type { MeResponse, RequestOtpInput, VerifyOtpInput } from '@pg/types';
-import { useLogout, useRequestOtp, useVerifyOtp } from '@pg/api-client';
+import type { MeResponse, VerifyTokenInput } from '@pg/types';
+import { useLogout, useVerifyToken } from '@pg/api-client';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { OkResponse } from '@pg/api-client';
 
 import { useApiClient } from './api-client';
 
 export interface UseAuth {
-  requestOtp: UseMutationResult<OkResponse, Error, RequestOtpInput>;
-  verifyOtp: UseMutationResult<MeResponse, Error, VerifyOtpInput>;
+  verifyToken: UseMutationResult<MeResponse, Error, VerifyTokenInput>;
   logout: UseMutationResult<OkResponse, Error, void>;
 }
 
 /**
- * Citizen-app auth hook: wraps `@pg/api-client`'s explicit-client hooks
- * (`useRequestOtp`/`useVerifyOtp`/`useLogout`) with the shared browser
- * client (see `./api-client.ts`), so feature components don't each have to
- * thread the client through themselves. Query invalidation (`queryKeys.me`
- * on verify/logout) is already handled inside those underlying hooks —
- * this wrapper adds no extra invalidation logic, just the client wiring.
+ * Citizen-app auth hook. Login is driven by the MSG91 widget (see
+ * `./otpWidget.ts`): the widget sends + verifies the OTP and yields an access
+ * token, which `verifyToken` exchanges for a session via
+ * `POST /auth/verify-token`. `me` invalidation on verify/logout is handled
+ * inside the underlying `@pg/api-client` hooks.
  */
 export function useAuth(): UseAuth {
   const client = useApiClient();
 
   return {
-    requestOtp: useRequestOtp(client),
-    verifyOtp: useVerifyOtp(client),
+    verifyToken: useVerifyToken(client),
     logout: useLogout(client),
   };
 }

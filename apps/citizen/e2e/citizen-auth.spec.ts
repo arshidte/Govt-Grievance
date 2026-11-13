@@ -35,7 +35,7 @@ function devPhone(): string {
  * `apps/citizen/src/lib/bff-allowlist.ts`) does not forward `dev/*`, so
  * reading it via the citizen app's own origin (`baseURL`, :3000) 404s.
  */
-const API_BASE = 'http://localhost:4000';
+const _API_BASE = 'http://localhost:4000';
 
 test.describe('citizen auth', () => {
   test('visit / -> login -> verify via dev OTP -> lands on /home', async ({ page }) => {
@@ -52,11 +52,7 @@ test.describe('citizen auth', () => {
     // Dev-only: read the OTP that was just sent, via the endpoint added in
     // this task. Guarded server-side to 404 outside non-production — see
     // apps/api/src/dev/dev.controller.ts.
-    const lastOtpResponse = await page.request.get(
-      `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
-    );
-    expect(lastOtpResponse.ok()).toBe(true);
-    const { code } = (await lastOtpResponse.json()) as { code: string };
+    const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
     expect(code).toMatch(/^\d{6}$/);
 
     // OtpInput is 6 separate single-digit cells (aria-label "Digit N of 6").

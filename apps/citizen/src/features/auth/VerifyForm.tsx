@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { verifyOtpSchema } from '@pg/types';
 import { Alert, Button, OtpInput } from '@pg/ui';
 
+import { verifyOtp as widgetVerifyOtp } from './otpWidget';
 import { useAuth } from './useAuth';
 
 export interface VerifyFormProps {
@@ -26,22 +27,35 @@ export interface VerifyFormProps {
  */
 export function VerifyForm({ phone, onVerified, onChangeNumber }: VerifyFormProps) {
   const t = useTranslations();
-  const { verifyOtp } = useAuth();
+  const { verifyToken } = useAuth();
   const [code, setCode] = useState('');
   const [clientError, setClientError] = useState<string | undefined>();
+  const [verifying, setVerifying] = useState(false);
 
-  const submit = (value: string) => {
+  // The MSG91 widget verifies the entered code and yields an access token,
+  // which `verifyToken` exchanges for a session.
+  const submit = async (value: string) => {
     const result = verifyOtpSchema.safeParse({ phone, code: value });
     if (!result.success) {
       setClientError(t('auth.invalidCode'));
       return;
     }
     setClientError(undefined);
-
-    verifyOtp.mutate(result.data, {
-      onSuccess: (me) => onVerified?.(Boolean(me.fullName)),
-    });
+    setVerifying(true);
+    try {
+      const accessToken = await widgetVerifyOtp(phone, value);
+      verifyToken.mutate(
+        { accessToken },
+        { onSuccess: (me) => onVerified?.(Boolean(me.fullName)) },
+      );
+    } catch {
+      setClientError(t('auth.verifyFailed'));
+    } finally {
+      setVerifying(false);
+    }
   };
+
+  const pending = verifying || verifyToken.isPending;
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,19 +64,19 @@ export function VerifyForm({ phone, onVerified, onChangeNumber }: VerifyFormProp
       <div data-testid="verify-otp-input">
         <OtpInput
           label={t('auth.otpLabel')}
-          disabled={verifyOtp.isPending}
+          disabled={pending}
           onChange={setCode}
           onComplete={submit}
         />
       </div>
 
-      {(clientError || verifyOtp.isError) && (
+      {(clientError || verifyToken.isError) && (
         <Alert variant="error" title={clientError ?? t('auth.verifyFailed')} />
       )}
 
       <Button
         type="button"
-        loading={verifyOtp.isPending}
+        loading={pending}
         onClick={() => submit(code)}
         data-testid="verify-submit"
       >

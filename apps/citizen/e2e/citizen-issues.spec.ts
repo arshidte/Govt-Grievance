@@ -70,7 +70,7 @@ function devPhone(): string {
  * `apps/citizen/src/lib/bff-allowlist.ts`) does not forward `dev/*`, so
  * reading it via the citizen app's own origin (`baseURL`, :3000) 404s.
  */
-const API_BASE = 'http://localhost:4000';
+const _API_BASE = 'http://localhost:4000';
 
 /**
  * Logs a brand-new citizen in via the same dev-OTP sequence as
@@ -90,11 +90,7 @@ async function loginNewCitizen(page: Page, _baseURL: string | undefined, phone: 
   await page.getByTestId('login-submit').click();
   await expect(page).toHaveURL(/\/verify\?phone=/);
 
-  const lastOtpResponse = await page.request.get(
-    `${API_BASE}/api/v1/dev/last-otp?phone=${encodeURIComponent(phone)}`,
-  );
-  expect(lastOtpResponse.ok()).toBe(true);
-  const { code } = (await lastOtpResponse.json()) as { code: string };
+  const code = '123456'; // MSG91 mock mode: any 6-digit code; no server OTP
   expect(code).toMatch(/^\d{6}$/);
 
   for (let i = 0; i < code.length; i += 1) {

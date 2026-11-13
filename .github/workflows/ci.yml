@@ -29,9 +29,9 @@ env:
   SESSION_COOKIE_NAME: pg_session
   SESSION_TTL_HOURS: 720
   OTP_TTL_SECONDS: 300
-  OTP_MAX_ATTEMPTS: 5
-  OTP_RATE_LIMIT_PER_PHONE_PER_HOUR: 5
-  SMS_PROVIDER: mock
+  # MSG91 verifier defaults to 'mock' outside production, so the suite logs in
+  # via `test-otp:<phone>` tokens — no external MSG91 account needed in CI.
+  MSG91_PROVIDER: mock
   API_INTERNAL_URL: http://localhost:4000
 
 jobs:

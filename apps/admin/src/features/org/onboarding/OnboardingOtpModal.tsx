@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import * as React from 'react';
 
 import { useApiClient } from '../../auth/api-client';
+import { retryOtp, sendOtp, verifyOtp as widgetVerifyOtp } from '../../auth/otpWidget';
 import { Modal } from '../../../components/Modal';
 import { orgErrorKey } from '../orgError';
 
@@ -34,30 +35,51 @@ export function OnboardingOtpModal({ open, onboarding, onClose, onVerified }: Pr
   const [code, setCode] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [verifying, setVerifying] = React.useState(false);
 
+  // On open, the MSG91 widget (in the admin's browser) sends the OTP to the
+  // staff member's phone. Fire-and-forget: a live-mode send error surfaces when
+  // the admin tries to verify/resend; in mock mode this is a no-op.
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || !onboarding) return;
     setCode('');
     setError(null);
     setNotice(null);
+    void sendOtp(onboarding.phone);
   }, [open, onboarding?.id]);
 
   if (!onboarding) return null;
 
-  function onVerify() {
+  // Verify the entered code through the widget (targeting the staff phone) to
+  // get an access token, then exchange it server-side for the role grant.
+  async function onVerify() {
     if (!onboarding) return;
     setError(null);
     setNotice(null);
-    verifyMut.mutate(
-      { id: onboarding.id, code: code.trim() },
-      { onSuccess: onVerified, onError: (err) => setError(tErr(orgErrorKey(err))) },
-    );
+    setVerifying(true);
+    try {
+      const accessToken = await widgetVerifyOtp(onboarding.phone, code.trim());
+      verifyMut.mutate(
+        { id: onboarding.id, accessToken },
+        { onSuccess: onVerified, onError: (err) => setError(tErr(orgErrorKey(err))) },
+      );
+    } catch {
+      setError(tErr('auth.verifyFailed'));
+    } finally {
+      setVerifying(false);
+    }
   }
 
-  function onResend() {
+  async function onResend() {
     if (!onboarding) return;
     setError(null);
     setNotice(null);
+    try {
+      await retryOtp(); // widget resends the code to the staff phone
+    } catch {
+      setError(tErr('auth.verifyFailed'));
+      return;
+    }
     resendMut.mutate(onboarding.id, {
       onSuccess: () => setNotice(t('resendSent')),
       onError: (err) => setError(tErr(orgErrorKey(err))),
@@ -97,13 +119,13 @@ export function OnboardingOtpModal({ open, onboarding, onClose, onVerified }: Pr
             {t('resend')}
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={verifyMut.isPending}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={verifying || verifyMut.isPending}>
               {tCommon('close')}
             </Button>
             <Button
               type="button"
               onClick={onVerify}
-              loading={verifyMut.isPending}
+              loading={verifying || verifyMut.isPending}
               disabled={code.length !== 6}
               data-testid="onboarding-verify-submit"
             >
