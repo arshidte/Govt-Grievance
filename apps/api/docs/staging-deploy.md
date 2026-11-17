@@ -70,9 +70,16 @@ Env vars (both projects):
 - `NEXT_PUBLIC_MSG91_WIDGET_ID` = `<your widget id>`
 - `NEXT_PUBLIC_MSG91_TOKEN_AUTH` = `<your widget token-auth>`
 
-Vercel auto-detects Next.js + the pnpm workspace. If the build fails to resolve
-workspace packages, set the project's **Install Command** to `pnpm install` and
-**Build Command** to `next build` (run from the app's Root Directory).
+Each app ships a committed **`vercel.json`** (`apps/citizen/vercel.json`,
+`apps/admin/vercel.json`) that pins the install + build commands:
+`pnpm install --frozen-lockfile` and `pnpm turbo run build --filter=@pg/<app>`.
+The turbo filter builds the workspace deps (`@pg/types` is compiled to `dist`
+before `next build`) — so you only need to set the **Root Directory** and the env
+vars; Vercel picks up the rest.
+
+Because the build reaches outside the app folder (the monorepo workspace), enable
+**Settings → Build & Development → "Include files outside of the root directory in
+the build step"** if Vercel doesn't auto-enable it for the monorepo.
 
 Note the two URLs, e.g. `https://panchayat-citizen.vercel.app`,
 `https://panchayat-admin.vercel.app`.
