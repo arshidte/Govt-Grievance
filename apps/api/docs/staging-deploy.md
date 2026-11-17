@@ -45,7 +45,10 @@ know after step 3 — set placeholders now, update later).
 
 **B. Manual Web Service** (if you prefer not to use the blueprint):
 - **Root Directory:** repo root
-- **Build:** `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @pg/api exec prisma generate && pnpm --filter @pg/api build && pnpm --filter @pg/api exec prisma migrate deploy`
+- **Build:** `corepack enable && NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @pg/api exec prisma generate && pnpm turbo run build --filter=@pg/api && pnpm --filter @pg/api exec prisma migrate deploy`
+  (`NODE_ENV=development` on install so devDependencies like `@nestjs/cli` are
+  installed even though the service env sets `NODE_ENV=production`; turbo builds
+  `@pg/types` — a runtime dependency with a gitignored `dist/` — before the API.)
 - **Start:** `node apps/api/dist/main.js`
 - **Health check path:** `/api/v1/health`
 - **Env:** `NODE_ENV=production`, `MSG91_PROVIDER=live`, `MSG91_AUTHKEY`,
