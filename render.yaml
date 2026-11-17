@@ -1,0 +1,45 @@
+# Render Blueprint for the Panchayat API (apps/api) — staging on the free tier.
+# Deploy: Render Dashboard → New → Blueprint → pick this repo. Then set the
+# secret env vars marked `sync: false` in the dashboard (they are NOT in git).
+#
+# The two Next.js apps (apps/citizen, apps/admin) are hosted on Vercel, not here
+# — see apps/api/docs/staging-deploy.md for the full walkthrough.
+services:
+  - type: web
+    name: panchayat-api
+    runtime: node
+    plan: free
+    region: singapore # closest free region to India; match your Neon region
+    rootDir: .
+    # Node version comes from .nvmrc (20). pnpm is activated via corepack
+    # (version pinned by package.json "packageManager"). `prisma migrate deploy`
+    # runs here (build env has the DB env vars) so each deploy applies pending
+    # migrations before the new instance starts.
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @pg/api exec prisma generate &&
+      pnpm --filter @pg/api build &&
+      pnpm --filter @pg/api exec prisma migrate deploy
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MSG91_PROVIDER
+        value: live
+      - key: SESSION_COOKIE_NAME
+        value: pg_session
+      - key: SESSION_TTL_HOURS
+        value: "720"
+      # --- Secrets / per-environment values: set these in the Render dashboard ---
+      - key: DATABASE_URL # Neon POOLED url (?sslmode=require)
+        sync: false
+      - key: DIRECT_DATABASE_URL # Neon DIRECT url (migrations)
+        sync: false
+      - key: MSG91_AUTHKEY # MSG91 server authkey (secret)
+        sync: false
+      - key: CORS_ORIGIN_CITIZEN # https://<citizen>.vercel.app
+        sync: false
+      - key: CORS_ORIGIN_ADMIN # https://<admin>.vercel.app
+        sync: false

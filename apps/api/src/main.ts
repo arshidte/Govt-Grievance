@@ -37,7 +37,10 @@ async function bootstrap(): Promise<void> {
   app.use(express.json({ limit: BODY_SIZE_LIMIT }));
   app.use(express.urlencoded({ limit: BODY_SIZE_LIMIT, extended: true }));
 
-  await app.listen(env.API_PORT);
+  // Most PaaS hosts (Render, Railway, Fly, …) inject the port to bind on via
+  // `PORT`. Prefer it when present so the app is reachable there; fall back to
+  // the configured `API_PORT` (default 4000) for local/dev.
+  await app.listen(process.env.PORT ? Number(process.env.PORT) : env.API_PORT);
 }
 
 bootstrap();
