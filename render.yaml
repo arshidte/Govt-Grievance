@@ -15,11 +15,19 @@ services:
     # (version pinned by package.json "packageManager"). `prisma migrate deploy`
     # runs here (build env has the DB env vars) so each deploy applies pending
     # migrations before the new instance starts.
+    #
+    # - `NODE_ENV=development` on install ONLY: Render exposes the service's
+    #   NODE_ENV=production to the build, which makes pnpm skip devDependencies
+    #   — but the build needs them (@nestjs/cli, prisma, turbo, typescript).
+    #   The running service still gets NODE_ENV=production from envVars below.
+    # - `turbo run build --filter=@pg/api` (not `pnpm --filter @pg/api build`):
+    #   the API imports runtime values from @pg/types, whose dist/ is
+    #   gitignored; turbo's `^build` compiles it first (same as vercel.json).
     buildCommand: >-
       corepack enable &&
-      pnpm install --frozen-lockfile &&
+      NODE_ENV=development pnpm install --frozen-lockfile &&
       pnpm --filter @pg/api exec prisma generate &&
-      pnpm --filter @pg/api build &&
+      pnpm turbo run build --filter=@pg/api &&
       pnpm --filter @pg/api exec prisma migrate deploy
     startCommand: node apps/api/dist/main.js
     healthCheckPath: /api/v1/health
