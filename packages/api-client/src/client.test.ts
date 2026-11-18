@@ -94,6 +94,18 @@ describe('createApiClient', () => {
     expect(headers.get('Cookie')).toBe('sid=abc123');
   });
 
+  it('adds the headers from getForwardedHeaders when provided (server-side end-user context)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 'u1' }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const getForwardedHeaders = vi.fn().mockResolvedValue({ 'x-pg-client-ip': '203.0.113.7' });
+    const client = createApiClient({ baseUrl: BASE_URL, getForwardedHeaders });
+    await client.getMe();
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Headers).get('x-pg-client-ip')).toBe('203.0.113.7');
+  });
+
   it('throws a sane ApiClientError when a non-OK body does not match the expected error shape', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('<html>Internal Server Error</html>', {

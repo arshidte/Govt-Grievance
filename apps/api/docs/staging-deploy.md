@@ -41,7 +41,9 @@ Two ways:
 reads [`render.yaml`](../../../render.yaml). Then open the service → **Environment**
 and fill the secrets marked `sync: false`: `DATABASE_URL`, `DIRECT_DATABASE_URL`,
 `MSG91_AUTHKEY`, `CORS_ORIGIN_CITIZEN`, `CORS_ORIGIN_ADMIN` (the last two you'll
-know after step 3 — set placeholders now, update later).
+know after step 3 — set placeholders now, update later), and `BFF_SHARED_SECRET`
+(see **Client IP / `BFF_SHARED_SECRET`** below — generate it once, use the same
+value on Render and both Vercel projects).
 
 **B. Manual Web Service** (if you prefer not to use the blueprint):
 - **Root Directory:** repo root
@@ -72,6 +74,29 @@ Env vars (both projects):
 - `NEXT_PUBLIC_MSG91_PROVIDER` = `live`
 - `NEXT_PUBLIC_MSG91_WIDGET_ID` = `<your widget id>`
 - `NEXT_PUBLIC_MSG91_TOKEN_AUTH` = `<your widget token-auth>`
+- `BFF_SHARED_SECRET` = the **same** value as on Render (server-only; it must
+  NOT be prefixed `NEXT_PUBLIC_`)
+
+### Client IP / `BFF_SHARED_SECRET`
+
+The API never sees the end user's socket: the browser talks to the Vercel BFF,
+which calls the API server-to-server, and Render adds its own proxy. Without
+this secret the API sees **every** request as the same client (`::1`), so the
+strict `/auth/*` rate limit (5/min) becomes platform-wide and audit/session IPs
+are meaningless.
+
+With it, each BFF sends the real client ip/user-agent (`x-pg-client-ip`,
+`x-pg-client-ua`, from Vercel's `x-forwarded-for`/`x-real-ip`) plus
+`x-pg-bff-auth: <secret>`; the API trusts those headers **only** when the secret
+matches (`apps/api/src/common/client-context.ts`). Direct callers cannot spoof
+another user's IP. Generate once (≥ 32 chars):
+
+```bash
+openssl rand -base64 48
+```
+
+Set it on Render (`BFF_SHARED_SECRET`) and on **both** Vercel projects, then
+redeploy all three. Blank/unset on any side = feature off (old behaviour).
 
 Each app ships a committed **`vercel.json`** (`apps/citizen/vercel.json`,
 `apps/admin/vercel.json`) that pins the install + build commands:

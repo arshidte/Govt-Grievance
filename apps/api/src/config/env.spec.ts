@@ -95,4 +95,23 @@ describe('loadEnv', () => {
       ).toBe(5);
     });
   });
+  describe('BFF_SHARED_SECRET', () => {
+    const base = { DATABASE_URL: 'postgresql://postgres:postgres@localhost:5433/panchayat' };
+
+    it('is undefined (feature off) when omitted', () => {
+      expect(loadEnv(base).BFF_SHARED_SECRET).toBeUndefined();
+    });
+
+    it('treats an empty value as unset so a blank platform env var cannot crash boot', () => {
+      expect(loadEnv({ ...base, BFF_SHARED_SECRET: '' }).BFF_SHARED_SECRET).toBeUndefined();
+    });
+
+    it('accepts a secret of at least 32 characters', () => {
+      expect(loadEnv({ ...base, BFF_SHARED_SECRET: 'x'.repeat(32) }).BFF_SHARED_SECRET).toBe('x'.repeat(32));
+    });
+
+    it('rejects a too-short secret', () => {
+      expect(() => loadEnv({ ...base, BFF_SHARED_SECRET: 'short' })).toThrow();
+    });
+  });
 });

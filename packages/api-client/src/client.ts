@@ -92,6 +92,13 @@ export interface CreateApiClientOptions {
    * cookies automatically via `credentials: 'include'`. May be sync or async.
    */
   getCookieHeader?: () => string | undefined | Promise<string | undefined>;
+  /**
+   * Optional hook for SERVER-side callers: extra headers added to every
+   * request — used to send the end user's context (`clientContextHeaders`),
+   * since a server-side call otherwise carries the server's own ip/user-agent.
+   * May be sync or async.
+   */
+  getForwardedHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
 }
 
 export interface ApiClient {
@@ -151,7 +158,7 @@ export interface ApiClient {
  * the `/api/v1` version prefix itself, so callers never repeat it.
  */
 export function createApiClient(options: CreateApiClientOptions): ApiClient {
-  const { baseUrl, getCookieHeader } = options;
+  const { baseUrl, getCookieHeader, getForwardedHeaders } = options;
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const url = `${baseUrl}${API_PREFIX}${path}`;
@@ -171,6 +178,12 @@ export function createApiClient(options: CreateApiClientOptions): ApiClient {
     if (getCookieHeader) {
       const cookie = await getCookieHeader();
       if (cookie) headers.set('Cookie', cookie);
+    }
+
+    if (getForwardedHeaders) {
+      for (const [name, value] of Object.entries(await getForwardedHeaders())) {
+        headers.set(name, value);
+      }
     }
 
     let response: Response;

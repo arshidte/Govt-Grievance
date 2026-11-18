@@ -1,7 +1,16 @@
 import type { Request, Response } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// Enable the BFF client-context feature for this suite (real env otherwise).
+// Requests without the BFF headers behave exactly as before.
+const { BFF_SECRET } = vi.hoisted(() => ({ BFF_SECRET: 'q'.repeat(48) }));
+vi.mock('../config/env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config/env')>();
+  return { env: { ...actual.env, BFF_SHARED_SECRET: BFF_SECRET } };
+});
+
 import { AuditService } from '../audit/audit.service';
+import { BFF_AUTH_HEADER, CLIENT_IP_HEADER, CLIENT_UA_HEADER } from '../common/client-context';
 import { ApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,6 +47,21 @@ function fakeRequest(cookies: Record<string, string> = {}): Request {
     ip: '203.0.113.9',
     get: (_header: string) => 'test-agent',
   } as unknown as Request;
+}
+
+/**
+ * A request as the API sees it in a deployment: socket ip is the platform
+ * proxy (`::1`), user-agent is the BFF's fetch (`node`), and the BFF asserts
+ * the real citizen via the secret-authenticated client-context headers.
+ */
+function fakeBffRequest(clientIp: string, clientUa: string): Request {
+  const headers: Record<string, string> = {
+    'user-agent': 'node',
+    [BFF_AUTH_HEADER]: BFF_SECRET,
+    [CLIENT_IP_HEADER]: clientIp,
+    [CLIENT_UA_HEADER]: clientUa,
+  };
+  return { cookies: {}, ip: '::1', get: (name: string) => headers[name.toLowerCase()] } as unknown as Request;
 }
 
 describe('AuthController (audit wiring)', () => {
@@ -96,6 +120,31 @@ describe('AuthController (audit wiring)', () => {
       expect(row.actorUserId).not.toBeNull();
       expect(JSON.stringify(row.metadata)).not.toContain(token);
       expect(JSON.stringify(row.metadata)).not.toContain(phone);
+    }
+  });
+
+  it('verify-token behind the BFF records the citizen ip + user-agent (not the proxy ::1 / node) on the session and audit rows', async () => {
+    const { controller } = makeController();
+    const phone = freshPhone();
+
+    const me = await controller.verifyToken(
+      { accessToken: `test-otp:${phone}` },
+      fakeBffRequest('203.0.113.50', 'Mozilla/5.0 (citizen)'),
+      fakeResponse(),
+    );
+
+    const session = await prisma.session.findFirst({
+      where: { userId: me.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(session?.ip).toBe('203.0.113.50');
+    expect(session?.userAgent).toBe('Mozilla/5.0 (citizen)');
+
+    const auditRows = [...(await findAuditRows('otp.verified', phone)), ...(await findAuditRows('session.created', phone))];
+    auditedIds.push(...auditRows.map((r) => r.id));
+    expect(auditRows.length).toBeGreaterThanOrEqual(2);
+    for (const row of auditRows) {
+      expect(row.ip).toBe('203.0.113.50');
     }
   });
 
