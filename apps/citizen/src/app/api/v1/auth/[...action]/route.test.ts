@@ -103,7 +103,8 @@ describe('BFF auth proxy route handler', () => {
 
     expect(response.status).toBe(202);
     const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(calledInit.body).toBe(payload);
+    // The relay forwards raw bytes (binary-safe); compare decoded content.
+    expect(await new Response(calledInit.body ?? null).text()).toBe(payload);
     const forwardedHeaders = calledInit.headers as Headers;
     expect(forwardedHeaders.get('content-type')).toBe('application/json');
   });

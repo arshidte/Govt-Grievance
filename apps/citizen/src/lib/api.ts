@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers';
-import { createApiClient } from '@pg/api-client';
+import { cookies, headers } from 'next/headers';
+import { clientContextHeaders, createApiClient } from '@pg/api-client';
 
 /**
  * Server-side API client. Used from server components / route handlers,
@@ -14,4 +14,9 @@ import { createApiClient } from '@pg/api-client';
 export const api = createApiClient({
   baseUrl: process.env.API_INTERNAL_URL!,
   getCookieHeader: async () => (await cookies()).toString(),
+  // The end user's ip/user-agent (secret-authenticated) so the API's per-IP
+  // throttling + audit see the real caller, not this server. See
+  // @pg/api-client clientContextHeaders and apps/api client-context.ts.
+  getForwardedHeaders: async () =>
+    clientContextHeaders(await headers(), process.env.BFF_SHARED_SECRET),
 });

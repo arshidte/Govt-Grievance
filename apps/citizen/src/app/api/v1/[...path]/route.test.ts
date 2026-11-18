@@ -121,7 +121,8 @@ describe('BFF general proxy route handler (/api/v1/*) — hardened allowlist', (
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [calledUrl, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(calledUrl).toBe(`${process.env.API_INTERNAL_URL}/api/v1/issues`);
-    expect(calledInit.body).toBe(payload);
+    // The relay forwards raw bytes (binary-safe); compare decoded content.
+    expect(await new Response(calledInit.body ?? null).text()).toBe(payload);
     expect((calledInit.headers as Headers).get('content-type')).toBe('application/json');
     expect(response.status).toBe(200);
   });
@@ -327,6 +328,117 @@ describe('BFF general proxy route handler (/api/v1/*) — hardened allowlist', (
 
     const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect((calledInit.headers as Headers).get('cookie')).toBe('pg_session=abc123');
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Row 10/11 — binary bodies survive the relay byte-for-byte (attachments).
+  // A text round-trip (`request.text()` / `response.text()`) replaces every
+  // invalid-UTF-8 byte with U+FFFD, corrupting JPEG/PNG uploads and
+  // downloads — the API then rejects the upload's magic bytes.
+  // ──────────────────────────────────────────────────────────────────────
+  // JPEG SOI/APP0 marker + bytes that are NOT valid UTF-8 on their own.
+  const BINARY = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x80, 0x81, 0xfe, 0xc3, 0x28]);
+
+  async function bytesOf(body: BodyInit | null | undefined): Promise<Uint8Array> {
+    return new Uint8Array(await new Response(body ?? null).arrayBuffer());
+  }
+
+  it('Row 10: relays a binary multipart upload body to upstream byte-for-byte', async () => {
+    const fetchMock = okFetch({ id: 'att-1' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const contentType = 'multipart/form-data; boundary=pgtest';
+    const request = new NextRequest('http://localhost:3000/api/v1/issues/abc-123/attachment', {
+      method: 'POST',
+      body: BINARY,
+      headers: { 'content-type': contentType, cookie: 'pg_session=abc123' },
+    });
+    await POST(request, { params: Promise.resolve({ path: ['issues', 'abc-123', 'attachment'] }) });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(await bytesOf(calledInit.body)).toEqual(BINARY);
+    expect((calledInit.headers as Headers).get('content-type')).toBe(contentType);
+  });
+
+  it('Row 11: relays a binary download byte-for-byte with Content-Disposition and Cache-Control', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(BINARY, {
+            status: 200,
+            headers: {
+              'content-type': 'image/jpeg',
+              'content-disposition': 'inline',
+              'cache-control': 'private, no-store',
+            },
+          }),
+      ),
+    );
+
+    const request = new NextRequest('http://localhost:3000/api/v1/attachments/att-1', {
+      method: 'GET',
+      headers: { cookie: 'pg_session=abc123' },
+    });
+    const response = await GET(request, { params: Promise.resolve({ path: ['attachments', 'att-1'] }) });
+
+    expect(response.status).toBe(200);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(BINARY);
+    expect(response.headers.get('content-type')).toBe('image/jpeg');
+    expect(response.headers.get('content-disposition')).toBe('inline');
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Row 12/13 — end-user context. Behind the BFF the API's socket ip is the
+  // platform proxy for everyone; the BFF asserts the real client (from the
+  // Vercel-set X-Forwarded-For) + user-agent, authenticated by the shared
+  // secret, so per-IP throttling and audit IPs are per citizen.
+  // ──────────────────────────────────────────────────────────────────────
+  it('Row 12: with BFF_SHARED_SECRET set, forwards the citizen ip + user-agent + secret to upstream', async () => {
+    vi.stubEnv('BFF_SHARED_SECRET', 'k'.repeat(48));
+    const fetchMock = okFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = new NextRequest('http://localhost:3000/api/v1/issues', {
+      method: 'GET',
+      headers: {
+        cookie: 'pg_session=abc123',
+        'x-forwarded-for': '203.0.113.7, 10.0.0.1',
+        'user-agent': 'Mozilla/5.0 (citizen)',
+      },
+    });
+    await GET(request, { params: Promise.resolve({ path: ['issues'] }) });
+
+    const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const forwarded = calledInit.headers as Headers;
+    expect(forwarded.get('x-pg-client-ip')).toBe('203.0.113.7');
+    expect(forwarded.get('x-pg-client-ua')).toBe('Mozilla/5.0 (citizen)');
+    expect(forwarded.get('x-pg-bff-auth')).toBe('k'.repeat(48));
+    vi.unstubAllEnvs();
+  });
+
+  it('Row 13: without BFF_SHARED_SECRET, forwards no client context — and never relays browser-sent x-pg-* headers', async () => {
+    vi.stubEnv('BFF_SHARED_SECRET', '');
+    const fetchMock = okFetch();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = new NextRequest('http://localhost:3000/api/v1/issues', {
+      method: 'GET',
+      headers: {
+        'x-forwarded-for': '203.0.113.7',
+        'x-pg-client-ip': '198.51.100.66',
+        'x-pg-bff-auth': 'guessed',
+      },
+    });
+    await GET(request, { params: Promise.resolve({ path: ['issues'] }) });
+
+    const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const forwarded = calledInit.headers as Headers;
+    expect(forwarded.get('x-pg-client-ip')).toBeNull();
+    expect(forwarded.get('x-pg-bff-auth')).toBeNull();
+    vi.unstubAllEnvs();
   });
 
   // ──────────────────────────────────────────────────────────────────────

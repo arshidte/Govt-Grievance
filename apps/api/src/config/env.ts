@@ -45,6 +45,18 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN_CITIZEN: z.string().min(1).default('http://localhost:3000'),
   CORS_ORIGIN_ADMIN: z.string().min(1).default('http://localhost:3001'),
+  // Shared secret proving a request comes from one of our BFFs (citizen/admin
+  // Next.js servers), which then may assert the END USER's ip/user-agent via
+  // `x-pg-client-ip` / `x-pg-client-ua` (see src/common/client-context.ts).
+  // Without it, every deployed request looks like the platform proxy (`::1`),
+  // so the per-IP throttler and audit/session IPs collapse to one client.
+  // Optional: unset = headers ignored (local dev/tests). Same value must be
+  // set on BOTH BFFs. NEVER commit a real value. An EMPTY value is treated as
+  // unset (a blank var created by a platform blueprint must not crash boot).
+  BFF_SHARED_SECRET: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(32, 'BFF_SHARED_SECRET must be at least 32 characters').optional(),
+  ),
   SESSION_COOKIE_NAME: z.string().min(1).default('pg_session'),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().default(720),
   // Validity window (seconds) of a pending staff-onboarding record — how long

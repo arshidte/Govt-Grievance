@@ -1,4 +1,5 @@
 export { createApiClient, ApiClientError } from './client';
+export { clientContextHeaders } from './client-context';
 export type { ApiClient, CreateApiClientOptions, OkResponse, OnBehalfResult } from './client';
 
 export { queryKeys } from './query-keys';

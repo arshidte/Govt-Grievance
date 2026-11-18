@@ -9,8 +9,8 @@ Staging on free tiers: **Neon** (Postgres) + **Render** (API) + **Vercel** (citi
 ## TL;DR
 
 1. **Neon** → create DB; `DATABASE_URL` = pooled, `DIRECT_DATABASE_URL` = direct (both `?sslmode=require`); run `prisma migrate deploy` + `db seed`.
-2. **Render** → New → Blueprint → this repo (`render.yaml`); set secrets: `DATABASE_URL`, `DIRECT_DATABASE_URL`, `MSG91_AUTHKEY`, `CORS_ORIGIN_CITIZEN/ADMIN`. Also `MSG91_PROVIDER=live`.
-3. **Vercel** → import twice; Root Directory `apps/citizen` / `apps/admin` (each has `vercel.json`); set `API_INTERNAL_URL` (= Render URL), `SESSION_COOKIE_NAME=pg_session`, `NEXT_PUBLIC_MSG91_PROVIDER=live`, `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_TOKEN_AUTH`.
+2. **Render** → New → Blueprint → this repo (`render.yaml`); set secrets: `DATABASE_URL`, `DIRECT_DATABASE_URL`, `MSG91_AUTHKEY`, `CORS_ORIGIN_CITIZEN/ADMIN`, `BFF_SHARED_SECRET` (`openssl rand -base64 48`). Also `MSG91_PROVIDER=live`.
+3. **Vercel** → import twice; Root Directory `apps/citizen` / `apps/admin` (each has `vercel.json`); set `API_INTERNAL_URL` (= Render URL), `SESSION_COOKIE_NAME=pg_session`, `NEXT_PUBLIC_MSG91_PROVIDER=live`, `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_TOKEN_AUTH`, and the **same** `BFF_SHARED_SECRET` as Render (without it, every user shares one API rate-limit bucket).
 4. Put the Vercel URLs into Render's `CORS_ORIGIN_*`; **whitelist both domains in the MSG91 dashboard**.
 5. Log in with a **real phone**, then promote it to ADMIN (SQL snippet in staging-deploy.md §5). Seed phones can't receive live OTP.
 

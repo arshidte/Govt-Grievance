@@ -51,3 +51,9 @@ services:
         sync: false
       - key: CORS_ORIGIN_ADMIN # https://<admin>.vercel.app
         sync: false
+      # Shared with BOTH Vercel projects (same value): proves a request came
+      # from our BFF so the API trusts its end-user ip/user-agent headers
+      # (per-user rate limits + real audit IPs). >= 32 random chars. Blank =
+      # feature off (every user shares one rate-limit bucket).
+      - key: BFF_SHARED_SECRET
+        sync: false

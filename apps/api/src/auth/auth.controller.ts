@@ -5,7 +5,9 @@ import type { Request, Response } from 'express';
 
 import { AuditService } from '../audit/audit.service';
 import { ApiError } from '../common/api-error';
+import { resolveClientContext, type ClientContext } from '../common/client-context';
 import { maskPhone } from '../common/mask-phone';
+import { env } from '../config/env';
 import { AUTH_THROTTLE_LIMIT, AUTH_THROTTLE_TTL_MS } from '../common/throttler.config';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 
@@ -15,6 +17,14 @@ import { buildClearSessionCookie, buildSessionCookie, SESSION_COOKIE_NAME } from
 import { CurrentUser } from './current-user.decorator';
 import { MSG91_VERIFIER, type Msg91Verifier } from './msg91/msg91-verifier.interface';
 import { SessionService, type SessionUser } from './session.service';
+
+/**
+ * The END USER's ip/user-agent for audit + session rows (BFF-asserted and
+ * secret-verified; falls back to the socket values). See client-context.ts.
+ */
+function clientContext(req: Request): ClientContext {
+  return resolveClientContext(req, env.BFF_SHARED_SECRET);
+}
 
 /**
  * Overrides the globally-registered `default` throttler (see
@@ -55,6 +65,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<MeResponse> {
+    const client = clientContext(req);
     let phone: string;
     try {
       ({ phone } = await this.verifier.verifyAccessToken(body.accessToken));
@@ -63,7 +74,7 @@ export class AuthController {
         // Audit the failed verification (no verified phone to attribute/mask),
         // then re-throw the SAME uniform error unchanged — the non-disclosure
         // contract must not be affected by auditing.
-        await this.audit.record({ action: 'otp.failed', entityType: 'User', ip: req.ip });
+        await this.audit.record({ action: 'otp.failed', entityType: 'User', ip: client.ip });
       }
       throw err;
     }
@@ -77,12 +88,12 @@ export class AuthController {
       entityType: 'User',
       entityId: user.id,
       metadata: { phoneMasked },
-      ip: req.ip,
+      ip: client.ip,
     });
 
     const { token } = await this.sessions.create(user.id, {
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
+      ip: client.ip,
+      userAgent: client.userAgent,
     });
 
     await this.audit.record({
@@ -91,7 +102,7 @@ export class AuthController {
       entityType: 'User',
       entityId: user.id,
       metadata: { phoneMasked },
-      ip: req.ip,
+      ip: client.ip,
     });
 
     const cookie = buildSessionCookie(token);
@@ -135,7 +146,7 @@ export class AuthController {
           action: 'session.revoked',
           entityType: 'User',
           entityId: actorUserId,
-          ip: req.ip,
+          ip: clientContext(req).ip,
         });
       }
     }

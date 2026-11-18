@@ -1,3 +1,4 @@
+import { clientContextHeaders } from '@pg/api-client';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { isPathSafe } from './bff-allowlist';
@@ -21,6 +22,19 @@ import { isPathSafe } from './bff-allowlist';
  */
 
 const UPSTREAM_BASE = process.env.API_INTERNAL_URL;
+
+/**
+ * Upstream response headers relayed to the browser (besides every
+ * `Set-Cookie`, handled separately below). `content-disposition` +
+ * `cache-control` matter for attachment downloads; `x-content-type-options`
+ * keeps the API's `nosniff` on a user-uploaded file.
+ */
+const RELAYED_RESPONSE_HEADERS = [
+  'content-type',
+  'content-disposition',
+  'cache-control',
+  'x-content-type-options',
+] as const;
 
 function upstreamUrl(pathSegments: string[], search: string): string {
   const path = pathSegments.join('/');
@@ -62,6 +76,14 @@ export async function proxyToApi(request: NextRequest, pathSegments: string[]): 
   if (contentType) headers.set('content-type', contentType);
   const cookie = request.headers.get('cookie');
   if (cookie) headers.set('cookie', cookie);
+  // End-user ip/user-agent for the API's per-IP throttling + audit (only
+  // when BFF_SHARED_SECRET is configured). Built from Vercel-set headers;
+  // any browser-sent `x-pg-*` header is never copied (fresh `headers` above).
+  for (const [name, value] of Object.entries(
+    clientContextHeaders(request.headers, process.env.BFF_SHARED_SECRET),
+  )) {
+    headers.set(name, value);
+  }
 
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
 
@@ -70,7 +92,10 @@ export async function proxyToApi(request: NextRequest, pathSegments: string[]): 
     upstreamResponse = await fetch(url, {
       method: request.method,
       headers,
-      body: hasBody ? await request.text() : undefined,
+      // Raw bytes, NOT `request.text()`: a text round-trip replaces every
+      // invalid-UTF-8 byte with U+FFFD, corrupting binary multipart uploads
+      // (attachments) before the API's magic-byte sniff ever sees them.
+      body: hasBody ? await request.arrayBuffer() : undefined,
       // Server-to-server call: this process IS the credential boundary for
       // the incoming browser request (we forward its Cookie header above
       // explicitly), so no `credentials` option is needed/applicable here.
@@ -84,15 +109,21 @@ export async function proxyToApi(request: NextRequest, pathSegments: string[]): 
     );
   }
 
-  const bodyText = await upstreamResponse.text();
-  const response = new NextResponse(bodyText, {
+  // Raw bytes for the same reason as the request body: attachment downloads
+  // are binary and must reach the browser unmodified. A null-body status
+  // (204/205/304) must be constructed with a null body or `Response` throws.
+  const bytes = await upstreamResponse.arrayBuffer();
+  const isNullBodyStatus = [204, 205, 304].includes(upstreamResponse.status);
+  const response = new NextResponse(isNullBodyStatus ? null : bytes, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
   });
 
-  const responseContentType = upstreamResponse.headers.get('content-type');
-  if (responseContentType) {
-    response.headers.set('content-type', responseContentType);
+  // Relay only an explicit set of representation headers. `content-length`
+  // is deliberately NOT copied (the runtime derives it from the body).
+  for (const name of RELAYED_RESPONSE_HEADERS) {
+    const value = upstreamResponse.headers.get(name);
+    if (value) response.headers.set(name, value);
   }
 
   // Set-Cookie footgun: `fetch`/`Headers.get('set-cookie')` folds MULTIPLE
