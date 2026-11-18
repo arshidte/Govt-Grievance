@@ -46,8 +46,12 @@ describe('Transition concurrency (e2e)', () => {
   let panchayatId: string;
   let wardId: string;
 
-  function freshPhone(tag: string): string {
-    const tail = `${Date.now()}${tag}`.replace(/\D/g, '').slice(-9).padStart(9, '0');
+  // Module-level counter keeps phones unique even when two users are created
+  // in the same millisecond (a timestamp alone collides on the unique index).
+  let phoneCounter = 0;
+  function freshPhone(): string {
+    phoneCounter += 1;
+    const tail = `${Date.now()}${phoneCounter}`.slice(-9).padStart(9, '0');
     return `+919${tail}`;
   }
 
@@ -80,7 +84,7 @@ describe('Transition concurrency (e2e)', () => {
     wardId = ward.id;
 
     const citizen = await prisma.user.create({
-      data: { phone: freshPhone('c'), fullName: 'Citizen' },
+      data: { phone: freshPhone(), fullName: 'Citizen' },
     });
     createdUserIds.push(citizen.id);
 
@@ -88,7 +92,7 @@ describe('Transition concurrency (e2e)', () => {
     // OTP login) per the T8 auth-throttle carry-in. The role is loaded onto the
     // SessionUser we hand to the service as `actor`.
     const staff = await prisma.user.create({
-      data: { phone: freshPhone('s'), fullName: 'Coordinator' },
+      data: { phone: freshPhone(), fullName: 'Coordinator' },
     });
     createdUserIds.push(staff.id);
     const ra = await prisma.roleAssignment.create({
